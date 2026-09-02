@@ -20,6 +20,21 @@ export interface StoreSettings {
   cod_enabled: boolean
   cod_prepay_delivery: boolean
   bkash_enabled: boolean
+  // bKash Personal (Send Money)
+  bkash_personal_enabled: boolean
+  bkash_personal_number: string
+  bkash_personal_name: string
+  bkash_personal_qr_url: string
+  // Email Integration (Resend)
+  resend_api_key: string
+  resend_from_email: string
+<<<<<<< HEAD
+  email_invoice_enabled: boolean
+  daily_digest_enabled: boolean
+  daily_digest_time: string
+  daily_digest_email: string
+=======
+>>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
   // bKash Credentials
   bkash_api_url: string
   bkash_app_key: string
@@ -89,6 +104,10 @@ export interface PublicStoreSettings {
   cod_enabled: boolean
   cod_prepay_delivery: boolean
   bkash_enabled: boolean
+  bkash_personal_enabled: boolean
+  bkash_personal_number: string
+  bkash_personal_name: string
+  bkash_personal_qr_url: string
   pathao_enabled: boolean
   steadfast_enabled: boolean
   active_shipping_provider: 'pathao' | 'steadfast'
@@ -136,6 +155,19 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   cod_enabled: true,
   cod_prepay_delivery: true,
   bkash_enabled: true,
+  bkash_personal_enabled: false,
+  bkash_personal_number: '',
+  bkash_personal_name: '',
+  bkash_personal_qr_url: '',
+  resend_api_key: process.env.RESEND_API_KEY || '',
+  resend_from_email: process.env.RESEND_FROM_EMAIL || '',
+<<<<<<< HEAD
+  email_invoice_enabled: true,
+  daily_digest_enabled: false,
+  daily_digest_time: '20:00',
+  daily_digest_email: '',
+=======
+>>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
   bkash_api_url: process.env.BKASH_API_URL || 'https://tokenized.sandbox.bka.sh/v1.2.0-beta',
   bkash_app_key: process.env.BKASH_APP_KEY || '',
   bkash_app_secret: process.env.BKASH_APP_SECRET || '',
@@ -212,6 +244,19 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       cod_enabled: data.cod_enabled !== undefined ? Boolean(data.cod_enabled) : DEFAULT_SETTINGS.cod_enabled,
       cod_prepay_delivery: data.cod_prepay_delivery !== undefined ? Boolean(data.cod_prepay_delivery) : DEFAULT_SETTINGS.cod_prepay_delivery,
       bkash_enabled: data.bkash_enabled !== undefined ? Boolean(data.bkash_enabled) : DEFAULT_SETTINGS.bkash_enabled,
+      bkash_personal_enabled: data.bkash_personal_enabled !== undefined ? Boolean(data.bkash_personal_enabled) : DEFAULT_SETTINGS.bkash_personal_enabled,
+      bkash_personal_number: data.bkash_personal_number || '',
+      bkash_personal_name: data.bkash_personal_name || '',
+      bkash_personal_qr_url: data.bkash_personal_qr_url || '',
+      resend_api_key: data.resend_api_key || DEFAULT_SETTINGS.resend_api_key,
+      resend_from_email: data.resend_from_email || DEFAULT_SETTINGS.resend_from_email,
+<<<<<<< HEAD
+      email_invoice_enabled: data.email_invoice_enabled !== undefined ? Boolean(data.email_invoice_enabled) : DEFAULT_SETTINGS.email_invoice_enabled,
+      daily_digest_enabled: data.daily_digest_enabled !== undefined ? Boolean(data.daily_digest_enabled) : DEFAULT_SETTINGS.daily_digest_enabled,
+      daily_digest_time: data.daily_digest_time || DEFAULT_SETTINGS.daily_digest_time,
+      daily_digest_email: data.daily_digest_email || DEFAULT_SETTINGS.daily_digest_email,
+=======
+>>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
       pathao_enabled: data.pathao_enabled !== undefined ? Boolean(data.pathao_enabled) : DEFAULT_SETTINGS.pathao_enabled,
       steadfast_enabled: data.steadfast_enabled !== undefined ? Boolean(data.steadfast_enabled) : DEFAULT_SETTINGS.steadfast_enabled,
       store_city_name: data.store_city_name || DEFAULT_SETTINGS.store_city_name,
@@ -268,6 +313,10 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     cod_enabled: full.cod_enabled,
     cod_prepay_delivery: full.cod_prepay_delivery,
     bkash_enabled: full.bkash_enabled,
+    bkash_personal_enabled: full.bkash_personal_enabled,
+    bkash_personal_number: full.bkash_personal_number,
+    bkash_personal_name: full.bkash_personal_name,
+    bkash_personal_qr_url: full.bkash_personal_qr_url,
     pathao_enabled: full.pathao_enabled,
     steadfast_enabled: full.steadfast_enabled,
     active_shipping_provider: full.active_shipping_provider || 'pathao',

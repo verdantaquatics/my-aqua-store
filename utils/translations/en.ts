@@ -29,6 +29,7 @@ export const en = {
     subtotal: 'Subtotal',
     currency: '৳',
     all: 'All',
+    view_all: 'View All',
     none: 'None',
     yes: 'Yes',
     no: 'No',
@@ -44,6 +45,7 @@ export const en = {
   nav: {
     home: 'Home',
     all_categories: 'All Categories',
+    all_products: 'All Products',
     featured: 'Featured',
     trending: 'Trending',
     best_seller: 'Best Seller',
@@ -86,6 +88,7 @@ export const en = {
     delivery_info: 'Delivery: Inside Dhaka 1-2 days, Outside Dhaka 2-3 days.',
     cash_on_delivery: 'Cash on Delivery Available',
     free_exchange: 'Easy exchange & return policy',
+    view_all: 'View All',
     view_product: 'View Details',
     related_products: 'You May Also Like',
     share: 'Share Product',
@@ -260,6 +263,31 @@ export const en = {
     stock_valuation: 'Stock Valuation',
     inventory_health: 'Inventory Health',
     save_settings: 'Save Settings',
-    logged_in_as: 'Logged in as'
+    logged_in_as: 'Logged in as',
+    promotions: 'Promotions & Campaigns',
+    coupons: 'Promo Codes'
+  },
+  promotions: {
+    title: 'Promotions & Campaigns',
+    banner: 'Pop-up Banner',
+    ribbon: 'Header Ribbon',
+    active: 'Active',
+    scheduled: 'Scheduled',
+    expired: 'Expired',
+    promo_code: 'Promo Code',
+    discount: 'Discount',
+    usage: 'Usage',
+    valid_until: 'Valid Until'
+  },
+  account: {
+    my_account: 'My Account',
+    my_orders: 'My Orders',
+    wishlist: 'Saved Wishlist',
+    profile: 'Profile Details',
+    password: 'Change Password',
+    sign_in: 'Sign In',
+    sign_up: 'Create Account',
+    logout: 'Sign Out',
+    save_changes: 'Save Changes'
   }
 }

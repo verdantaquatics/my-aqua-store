@@ -48,6 +48,19 @@ export async function PUT(request: NextRequest) {
       cod_enabled: body.cod_enabled !== undefined ? Boolean(body.cod_enabled) : current.cod_enabled,
       cod_prepay_delivery: body.cod_prepay_delivery !== undefined ? Boolean(body.cod_prepay_delivery) : current.cod_prepay_delivery,
       bkash_enabled: body.bkash_enabled !== undefined ? Boolean(body.bkash_enabled) : current.bkash_enabled,
+      bkash_personal_enabled: body.bkash_personal_enabled !== undefined ? Boolean(body.bkash_personal_enabled) : current.bkash_personal_enabled,
+      bkash_personal_number: body.bkash_personal_number !== undefined ? body.bkash_personal_number : current.bkash_personal_number,
+      bkash_personal_name: body.bkash_personal_name !== undefined ? body.bkash_personal_name : current.bkash_personal_name,
+      bkash_personal_qr_url: body.bkash_personal_qr_url !== undefined ? body.bkash_personal_qr_url : current.bkash_personal_qr_url,
+      resend_api_key: body.resend_api_key !== undefined ? body.resend_api_key : current.resend_api_key,
+      resend_from_email: body.resend_from_email !== undefined ? body.resend_from_email : current.resend_from_email,
+<<<<<<< HEAD
+      email_invoice_enabled: body.email_invoice_enabled !== undefined ? Boolean(body.email_invoice_enabled) : current.email_invoice_enabled,
+      daily_digest_enabled: body.daily_digest_enabled !== undefined ? Boolean(body.daily_digest_enabled) : current.daily_digest_enabled,
+      daily_digest_time: body.daily_digest_time !== undefined ? body.daily_digest_time : current.daily_digest_time,
+      daily_digest_email: body.daily_digest_email !== undefined ? body.daily_digest_email : current.daily_digest_email,
+=======
+>>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
       bkash_api_url: body.bkash_api_url !== undefined ? body.bkash_api_url : current.bkash_api_url,
       bkash_app_key: body.bkash_app_key !== undefined ? body.bkash_app_key : current.bkash_app_key,
       bkash_app_secret: body.bkash_app_secret !== undefined ? body.bkash_app_secret : current.bkash_app_secret,
@@ -104,25 +117,68 @@ export async function PUT(request: NextRequest) {
 
     let savedData
     if (existingRow?.id) {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('store_settings')
         .update(updatedPayload)
         .eq('id', existingRow.id)
         .select()
-        .single()
-      if (error) throw error
-      savedData = data
+        .maybeSingle()
+
+      // If schema cache lacks newly added columns (before SQL migration is run)
+      if (error && (error.message?.includes('schema cache') || error.code === 'PGRST204')) {
+        const fallbackPayload: Record<string, any> = { ...updatedPayload }
+        delete fallbackPayload.resend_from_email
+        delete fallbackPayload.email_invoice_enabled
+        delete fallbackPayload.daily_digest_enabled
+        delete fallbackPayload.daily_digest_time
+        delete fallbackPayload.daily_digest_email
+        const retry = await supabase
+          .from('store_settings')
+          .update(fallbackPayload)
+          .eq('id', existingRow.id)
+          .select()
+          .maybeSingle()
+
+        if (retry.error) throw retry.error
+        data = retry.data
+      } else if (error) {
+        throw error
+      }
+
+      savedData = data || updatedPayload
     } else {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('store_settings')
         .insert({
           id: '00000000-0000-0000-0000-000000000001',
           ...updatedPayload
         })
         .select()
-        .single()
-      if (error) throw error
-      savedData = data
+        .maybeSingle()
+
+      if (error && (error.message?.includes('schema cache') || error.code === 'PGRST204')) {
+        const fallbackPayload: Record<string, any> = { ...updatedPayload }
+        delete fallbackPayload.resend_from_email
+        delete fallbackPayload.email_invoice_enabled
+        delete fallbackPayload.daily_digest_enabled
+        delete fallbackPayload.daily_digest_time
+        delete fallbackPayload.daily_digest_email
+        const retry = await supabase
+          .from('store_settings')
+          .insert({
+            id: '00000000-0000-0000-0000-000000000001',
+            ...fallbackPayload
+          })
+          .select()
+          .maybeSingle()
+
+        if (retry.error) throw retry.error
+        data = retry.data
+      } else if (error) {
+        throw error
+      }
+
+      savedData = data || updatedPayload
     }
 
     // Clear server in-memory cache
