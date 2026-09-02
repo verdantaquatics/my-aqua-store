@@ -15,11 +15,7 @@ import {
   BarChart3, ShoppingBag, Package, LogOut, Settings, Save,
   Check, AlertCircle, RefreshCw, Upload, Sparkles, Truck,
   CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye,
-<<<<<<< HEAD
   Share2, MessageCircle, Globe, Smartphone, X, Clock, Send, Loader2
-=======
-  Share2, MessageCircle, Globe, Smartphone, X
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -38,7 +34,6 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [bkashWarningModal, setBkashWarningModal] = useState(false)
-<<<<<<< HEAD
   const [testDigestLoading, setTestDigestLoading] = useState(false)
 
   const handleSendTestDailyDigest = async () => {
@@ -57,8 +52,6 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
       setTestDigestLoading(false)
     }
   }
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
 
   const handleSave = async (customPayload?: Partial<StoreSettings>) => {
     setSaving(true)
@@ -1802,174 +1795,172 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       Leave blank to use the default sandbox (<code className="text-brand-600">onboarding@resend.dev</code>). If you added a custom domain in Resend, enter your domain's email here.
                     </p>
                   </div>
-<<<<<<< HEAD
 
-  {/* AUTOMATED INVOICE EMAILS TOGGLE */ }
-  <div className="pt-3 border-t border-slate-200">
-    <div className="flex items-center justify-between">
-      <div>
-        <h4 className="text-xs font-bold text-slate-900">
-          Automated Customer Invoices
-        </h4>
-        <p className="text-[11px] text-slate-500 mt-0.5">
-          Automatically send an order confirmation & itemized invoice email to customers upon checkout.
-        </p>
+                  {/* AUTOMATED INVOICE EMAILS TOGGLE */}
+                  <div className="pt-3 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          Automated Customer Invoices
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Automatically send an order confirmation & itemized invoice email to customers upon checkout.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, email_invoice_enabled: settings.email_invoice_enabled === false })}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          settings.email_invoice_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            settings.email_invoice_enabled !== false ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DAILY PENDING ORDERS SUMMARY DIGEST */}
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-brand-600" />
+                          <h4 className="text-xs font-bold text-slate-900">
+                            Daily Pending Orders Summary
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Send a daily executive email digest of all unfulfilled/pending orders directly to the store owner.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, daily_digest_enabled: !settings.daily_digest_enabled })}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          settings.daily_digest_enabled ? 'bg-brand-600' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            settings.daily_digest_enabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {settings.daily_digest_enabled && (
+                      <div className="p-3.5 rounded-xl border border-brand-200/80 bg-brand-50/30 space-y-3 mt-2 animate-fadeIn">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                              Daily Delivery Time (BST / Dhaka)
+                            </label>
+                            <select
+                              value={settings.daily_digest_time || '20:00'}
+                              onChange={(e) => setSettings({ ...settings, daily_digest_time: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                            >
+                              <option value="08:00">08:00 AM (Morning Kickoff)</option>
+                              <option value="09:00">09:00 AM</option>
+                              <option value="10:00">10:00 AM</option>
+                              <option value="12:00">12:00 PM (Noon)</option>
+                              <option value="15:00">03:00 PM</option>
+                              <option value="18:00">06:00 PM (Evening)</option>
+                              <option value="20:00">08:00 PM (Night Summary - Default)</option>
+                              <option value="21:00">09:00 PM</option>
+                              <option value="22:00">10:00 PM</option>
+                              <option value="23:00">11:00 PM</option>
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Scheduled via Vercel Cron in Bangladesh Time (UTC+6).
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                              Owner Recipient Email
+                            </label>
+                            <input
+                              type="email"
+                              value={settings.daily_digest_email || ''}
+                              onChange={(e) => setSettings({ ...settings, daily_digest_email: e.target.value })}
+                              placeholder={settings.contact_email ? `Defaults to: ${settings.contact_email}` : 'owner@yourcompany.com'}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Leave empty to send to store contact email ({settings.contact_email || 'not set'}).
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-brand-200/50">
+                          <span className="text-[11px] text-slate-600">
+                            Want to test the summary email right now?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleSendTestDailyDigest}
+                            disabled={testDigestLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
+                          >
+                            {testDigestLoading ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Sending...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-3.5 w-3.5" />
+                                <span>Send Test Summary Now</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </main>
       </div>
-      <button
-        type="button"
-        onClick={() => setSettings({ ...settings, email_invoice_enabled: settings.email_invoice_enabled === false })}
-        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.email_invoice_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
-          }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.email_invoice_enabled !== false ? 'translate-x-4' : 'translate-x-0'
-            }`}
-        />
-      </button>
-    </div>
-  </div>
 
-  {/* DAILY PENDING ORDERS SUMMARY DIGEST */ }
-  <div className="pt-3 border-t border-slate-200 space-y-3">
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 text-brand-600" />
-          <h4 className="text-xs font-bold text-slate-900">
-            Daily Pending Orders Summary
-          </h4>
-        </div>
-        <p className="text-[11px] text-slate-500 mt-0.5">
-          Send a daily executive email digest of all unfulfilled/pending orders directly to the store owner.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => setSettings({ ...settings, daily_digest_enabled: !settings.daily_digest_enabled })}
-        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.daily_digest_enabled ? 'bg-brand-600' : 'bg-slate-200'
-          }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.daily_digest_enabled ? 'translate-x-4' : 'translate-x-0'
-            }`}
-        />
-      </button>
-    </div>
+      {/* BKASH SETUP REQUIREMENT POPUP MODAL */}
+      {bkashWarningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 animate-scale-up">
+            <div className="h-14 w-14 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center mx-auto border border-pink-200">
+              <Smartphone className="h-7 w-7" />
+            </div>
 
-    {settings.daily_digest_enabled && (
-      <div className="p-3.5 rounded-xl border border-brand-200/80 bg-brand-50/30 space-y-3 mt-2 animate-fadeIn">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-              Daily Delivery Time (BST / Dhaka)
-            </label>
-            <select
-              value={settings.daily_digest_time || '20:00'}
-              onChange={(e) => setSettings({ ...settings, daily_digest_time: e.target.value })}
-              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-            >
-              <option value="08:00">08:00 AM (Morning Kickoff)</option>
-              <option value="09:00">09:00 AM</option>
-              <option value="10:00">10:00 AM</option>
-              <option value="12:00">12:00 PM (Noon)</option>
-              <option value="15:00">03:00 PM</option>
-              <option value="18:00">06:00 PM (Evening)</option>
-              <option value="20:00">08:00 PM (Night Summary - Default)</option>
-              <option value="21:00">09:00 PM</option>
-              <option value="22:00">10:00 PM</option>
-              <option value="23:00">11:00 PM</option>
-            </select>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Scheduled via Vercel Cron in Bangladesh Time (UTC+6).
+            <h3 className="text-base font-black text-slate-950">
+              Set Up bKash First
+            </h3>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              To require advance delivery charge prepayment from customers, you must first enable and set up either <strong>bKash Personal (Send Money)</strong> or <strong>bKash Online Payment Gateway</strong> in the payment section below.
             </p>
-          </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-              Owner Recipient Email
-            </label>
-            <input
-              type="email"
-              value={settings.daily_digest_email || ''}
-              onChange={(e) => setSettings({ ...settings, daily_digest_email: e.target.value })}
-              placeholder={settings.contact_email ? `Defaults to: ${settings.contact_email}` : 'owner@yourcompany.com'}
-              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">
-              Leave empty to send to store contact email ({settings.contact_email || 'not set'}).
-            </p>
+            <div className="pt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setBkashWarningModal(false)}
+                className="w-full sm:w-auto min-w-[120px] py-2.5 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="pt-2 flex items-center justify-between border-t border-brand-200/50">
-          <span className="text-[11px] text-slate-600">
-            Want to test the summary email right now?
-          </span>
-          <button
-            type="button"
-            onClick={handleSendTestDailyDigest}
-            disabled={testDigestLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
-          >
-            {testDigestLoading ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Sending...</span>
-              </>
-            ) : (
-              <>
-                <Send className="h-3.5 w-3.5" />
-                <span>Send Test Summary Now</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    )}
-  </div>
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
-                </div >
-
-              </div >
-            </div >
-          )
-}
-
-        </main >
-      </div >
-
-  {/* BKASH SETUP REQUIREMENT POPUP MODAL */ }
-{
-  bkashWarningModal && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 animate-scale-up">
-        <div className="h-14 w-14 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center mx-auto border border-pink-200">
-          <Smartphone className="h-7 w-7" />
-        </div>
-
-        <h3 className="text-base font-black text-slate-950">
-          Set Up bKash First
-        </h3>
-
-        <p className="text-xs text-slate-600 leading-relaxed">
-          To require advance delivery charge prepayment from customers, you must first enable and set up either <strong>bKash Personal (Send Money)</strong> or <strong>bKash Online Payment Gateway</strong> in the payment section below.
-        </p>
-
-        <div className="pt-2 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setBkashWarningModal(false)}
-            className="w-full sm:w-auto min-w-[120px] py-2.5 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition"
-          >
-            Close
-          </button>
-        </div>
-      </div>
     </div>
-  )
-}
-
-    </div >
   )
 }

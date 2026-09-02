@@ -54,13 +54,10 @@ export async function PUT(request: NextRequest) {
       bkash_personal_qr_url: body.bkash_personal_qr_url !== undefined ? body.bkash_personal_qr_url : current.bkash_personal_qr_url,
       resend_api_key: body.resend_api_key !== undefined ? body.resend_api_key : current.resend_api_key,
       resend_from_email: body.resend_from_email !== undefined ? body.resend_from_email : current.resend_from_email,
-<<<<<<< HEAD
       email_invoice_enabled: body.email_invoice_enabled !== undefined ? Boolean(body.email_invoice_enabled) : current.email_invoice_enabled,
       daily_digest_enabled: body.daily_digest_enabled !== undefined ? Boolean(body.daily_digest_enabled) : current.daily_digest_enabled,
       daily_digest_time: body.daily_digest_time !== undefined ? body.daily_digest_time : current.daily_digest_time,
       daily_digest_email: body.daily_digest_email !== undefined ? body.daily_digest_email : current.daily_digest_email,
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
       bkash_api_url: body.bkash_api_url !== undefined ? body.bkash_api_url : current.bkash_api_url,
       bkash_app_key: body.bkash_app_key !== undefined ? body.bkash_app_key : current.bkash_app_key,
       bkash_app_secret: body.bkash_app_secret !== undefined ? body.bkash_app_secret : current.bkash_app_secret,

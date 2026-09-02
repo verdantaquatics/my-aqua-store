@@ -1,8 +1,5 @@
 import { getStoreSettings } from '@/utils/settings'
-<<<<<<< HEAD
 import { createAdminClient } from '@/utils/supabase/server'
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
 import axios from 'axios'
 
 interface InvoiceEmailPayload {
@@ -38,7 +35,6 @@ export async function getResendApiKey(): Promise<string> {
  */
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload) {
   try {
-<<<<<<< HEAD
     const settings = await getStoreSettings()
 
     // Check if store owner disabled customer invoice emails
@@ -47,18 +43,11 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload) {
       return { success: false, reason: 'Automated invoice emails are disabled in store settings' }
     }
 
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
     const apiKey = await getResendApiKey()
     if (!apiKey) {
       console.warn('Resend API key is not configured. Skipping invoice email.')
       return { success: false, reason: 'No Resend API key configured' }
     }
-<<<<<<< HEAD
-=======
-
-    const settings = await getStoreSettings()
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
     const storeName = settings.store_name || 'Online Store'
     const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
     const sender = fromEmail.includes('<') ? fromEmail : `${storeName} <${fromEmail}>`
@@ -69,8 +58,8 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload) {
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b;">
           <strong>${item.name}</strong>
           ${item.selectedVariations && Object.keys(item.selectedVariations).length > 0
-        ? `<div style="font-size: 11px; color: #64748b;">${Object.entries(item.selectedVariations).map(([k, v]) => `${k}: ${v}`).join(', ')}</div>`
-        : ''}
+            ? `<div style="font-size: 11px; color: #64748b;">${Object.entries(item.selectedVariations).map(([k, v]) => `${k}: ${v}`).join(', ')}</div>`
+            : ''}
         </td>
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b; text-align: center;">
           ${item.quantity}
@@ -286,7 +275,6 @@ export async function sendPromoEmail(
     throw error
   }
 }
-<<<<<<< HEAD
 
 /**
  * Send scheduled daily summary of pending/unfulfilled orders to store owner
@@ -548,5 +536,3 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
     return { success: false, error: error.response?.data?.message || error.message }
   }
 }
-=======
->>>>>>> 9b4a913967f6daf4d01d832faeb6992c8c6120af
