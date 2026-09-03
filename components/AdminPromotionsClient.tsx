@@ -9,7 +9,7 @@ import {
   Megaphone, Plus, Trash2, Edit2, Copy, Check, Calendar,
   Percent, DollarSign, Truck, AlertCircle, Eye, Mail,
   CheckCircle2, Loader2, Sparkles, Image as ImageIcon, Layout,
-  X, Search, Users, Send
+  X, Search, Users, Send, Info, HelpCircle
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -34,6 +34,7 @@ interface PromoCode {
   min_order_amount: number
   max_discount: number
   usage_limit: number
+  per_user_limit?: number
   usage_count: number
   included_product_ids: string[]
   excluded_product_ids: string[]
@@ -107,6 +108,7 @@ export default function AdminPromotionsClient({
   const [minOrderAmount, setMinOrderAmount] = useState<number>(0)
   const [maxDiscount, setMaxDiscount] = useState<number>(0)
   const [usageLimit, setUsageLimit] = useState<number>(0)
+  const [perUserLimit, setPerUserLimit] = useState<number>(0)
   const [includedProductIds, setIncludedProductIds] = useState<string[]>([])
   const [excludedProductIds, setExcludedProductIds] = useState<string[]>([])
   const [includedCategoryIds, setIncludedCategoryIds] = useState<string[]>([])
@@ -230,6 +232,7 @@ export default function AdminPromotionsClient({
       setMinOrderAmount(code.min_order_amount || 0)
       setMaxDiscount(code.max_discount || 0)
       setUsageLimit(code.usage_limit || 0)
+      setPerUserLimit(code.per_user_limit || 0)
       setIncludedProductIds(code.included_product_ids || [])
       setExcludedProductIds(code.excluded_product_ids || [])
       setIncludedCategoryIds(code.included_category_ids || [])
@@ -259,6 +262,7 @@ export default function AdminPromotionsClient({
       setMinOrderAmount(0)
       setMaxDiscount(0)
       setUsageLimit(0)
+      setPerUserLimit(0)
       setIncludedProductIds([])
       setExcludedProductIds([])
       setIncludedCategoryIds([])
@@ -289,6 +293,7 @@ export default function AdminPromotionsClient({
         min_order_amount: Number(minOrderAmount),
         max_discount: Number(maxDiscount),
         usage_limit: Number(usageLimit),
+        per_user_limit: Number(perUserLimit),
         included_product_ids: productFilterMode === 'include' ? includedProductIds : [],
         excluded_product_ids: productFilterMode === 'exclude' ? excludedProductIds : [],
         included_category_ids: categoryFilterMode === 'include' ? includedCategoryIds : [],
@@ -731,12 +736,17 @@ export default function AdminPromotionsClient({
                         </td>
 
                         <td className="px-6 py-4">
-                          <span className="font-bold text-slate-900">
+                          <div className="font-bold text-slate-900">
                             {code.usage_count}
-                          </span>
-                          <span className="text-slate-400">
-                            {code.usage_limit > 0 ? ` / ${code.usage_limit}` : ' (Unlimited)'}
-                          </span>
+                            <span className="text-slate-400 font-normal">
+                              {code.usage_limit > 0 ? ` / ${code.usage_limit}` : ' (Unlimited)'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                            {code.per_user_limit && code.per_user_limit > 0
+                              ? `Limit: ${code.per_user_limit}x per customer`
+                              : 'Unlimited per customer'}
+                          </div>
                         </td>
 
                         <td className="px-6 py-4 text-slate-500 text-[11px]">
@@ -1128,7 +1138,7 @@ export default function AdminPromotionsClient({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                       Min Order ৳
@@ -1141,6 +1151,7 @@ export default function AdminPromotionsClient({
                       placeholder="0 = No Min"
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
                     />
+                    <p className="text-[10px] text-slate-400 mt-0.5">Minimum cart subtotal required</p>
                   </div>
 
                   {discountType === 'percentage' && (
@@ -1156,21 +1167,72 @@ export default function AdminPromotionsClient({
                         placeholder="0 = No Cap"
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
                       />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Maximum ceiling discount</p>
                     </div>
                   )}
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      Usage Limit
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={usageLimit}
-                      onChange={(e) => setUsageLimit(Number(e.target.value))}
-                      placeholder="0 = Unlimited"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                    />
+                {/* REDEMPTION & USAGE LIMITS WITH TOOLTIPS */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-200 pb-2">
+                    <Percent className="h-3.5 w-3.5 text-brand-600" />
+                    <span>Redemption & Usage Restrictions</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* 1. Global Store Usage Limit */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1">
+                          <span>Total Store Usage Limit</span>
+                          <div className="group relative inline-block">
+                            <Info className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-52 p-2.5 bg-slate-900 text-white text-[10px] rounded-xl shadow-2xl z-50 leading-relaxed font-normal normal-case">
+                              <strong className="text-brand-300 block mb-0.5">Global Store-Wide Quota:</strong>
+                              The total maximum number of times this coupon can be redeemed across your whole store by all customers combined. (0 = Unlimited).
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={usageLimit}
+                        onChange={(e) => setUsageLimit(Number(e.target.value))}
+                        placeholder="0 = Unlimited store-wide"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        0 = Unlimited total redemptions
+                      </p>
+                    </div>
+
+                    {/* 2. Per User / Customer Limit */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1">
+                          <span>Per Customer Limit</span>
+                          <div className="group relative inline-block">
+                            <Info className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-56 p-2.5 bg-slate-900 text-white text-[10px] rounded-xl shadow-2xl z-50 leading-relaxed font-normal normal-case">
+                              <strong className="text-emerald-300 block mb-0.5">Per-Customer Quota:</strong>
+                              Maximum times an individual customer (matched by their account, phone number, or email) can use this coupon. Set to 1 for first-time or one-time coupons. (0 = Unlimited).
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={perUserLimit}
+                        onChange={(e) => setPerUserLimit(Number(e.target.value))}
+                        placeholder="0 = Unlimited per customer"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        1 = Once per customer, 0 = Unlimited
+                      </p>
+                    </div>
                   </div>
                 </div>
 

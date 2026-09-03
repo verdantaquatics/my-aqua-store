@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       min_order_amount,
       max_discount,
       usage_limit,
+      per_user_limit,
       included_product_ids,
       excluded_product_ids,
       included_category_ids,
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         min_order_amount: Number(min_order_amount || 0),
         max_discount: Number(max_discount || 0),
         usage_limit: Number(usage_limit || 0),
+        per_user_limit: Number(per_user_limit || 0),
         usage_count: 0,
         included_product_ids: Array.isArray(included_product_ids) ? included_product_ids : [],
         excluded_product_ids: Array.isArray(excluded_product_ids) ? excluded_product_ids : [],
@@ -115,6 +117,7 @@ export async function PUT(request: NextRequest) {
       min_order_amount,
       max_discount,
       usage_limit,
+      per_user_limit,
       included_product_ids,
       excluded_product_ids,
       included_category_ids,
@@ -136,6 +139,7 @@ export async function PUT(request: NextRequest) {
     if (min_order_amount !== undefined) updates.min_order_amount = Number(min_order_amount)
     if (max_discount !== undefined) updates.max_discount = Number(max_discount)
     if (usage_limit !== undefined) updates.usage_limit = Number(usage_limit)
+    if (per_user_limit !== undefined) updates.per_user_limit = Number(per_user_limit)
     if (included_product_ids !== undefined) updates.included_product_ids = Array.isArray(included_product_ids) ? included_product_ids : []
     if (excluded_product_ids !== undefined) updates.excluded_product_ids = Array.isArray(excluded_product_ids) ? excluded_product_ids : []
     if (included_category_ids !== undefined) updates.included_category_ids = Array.isArray(included_category_ids) ? included_category_ids : []
