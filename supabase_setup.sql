@@ -420,14 +420,20 @@ CREATE TABLE IF NOT EXISTS public.promo_codes (
     min_order_amount NUMERIC(10,2) DEFAULT 0,
     max_discount NUMERIC(10,2) DEFAULT 0,
     usage_limit INT DEFAULT 0,
+    per_user_limit INT DEFAULT 0,
     usage_count INT DEFAULT 0,
     included_product_ids UUID[] DEFAULT '{}',
     excluded_product_ids UUID[] DEFAULT '{}',
+    included_category_ids UUID[] DEFAULT '{}',
+    excluded_category_ids UUID[] DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
     start_date TIMESTAMPTZ DEFAULT NOW(),
     end_date TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS per_user_limit INT DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS included_category_ids UUID[] DEFAULT '{}';
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS excluded_category_ids UUID[] DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON public.promo_codes(code);
 CREATE INDEX IF NOT EXISTS idx_promo_codes_is_active ON public.promo_codes(is_active);
 
