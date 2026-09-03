@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyStaffAuth(['shop_owner', 'admin'])
     if (!auth.authorized) {
-      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+      const errMsg = typeof auth.error === 'string' ? auth.error : 'Unauthorized access. Staff account not found.'
+      return NextResponse.json({ success: false, error: errMsg }, { status: auth.status || 403 })
     }
 
     const body = await request.json()
@@ -45,6 +46,13 @@ export async function POST(request: NextRequest) {
     if (!email || !password || !full_name) {
       return NextResponse.json(
         { success: false, error: 'Full Name, Email, and Password are required.' },
+        { status: 400 }
+      )
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters long.' },
         { status: 400 }
       )
     }
@@ -66,8 +74,10 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError) {
-      // If user already exists in auth.users, check if they are already in staff_members
-      if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already exists')) {
+      const authErrMsg = (authError.message || '').toLowerCase()
+      // If user already exists in auth.users
+      if (authErrMsg.includes('already registered') || authErrMsg.includes('already exists') || (authError as any).code === 'email_exists') {
+        // Check if user already exists in staff_members table
         const { data: existingStaff } = await supabase
           .from('staff_members')
           .select('id')
@@ -80,9 +90,25 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
+
+        // Fetch auth user ID from Supabase auth users
+        const { data: usersData } = await supabase.auth.admin.listUsers()
+        const matched = usersData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail)
+        if (matched) {
+          authUserId = matched.id
+          // Update their password and role metadata
+          await supabase.auth.admin.updateUserById(matched.id, {
+            password: password,
+            user_metadata: {
+              full_name,
+              role: cleanRole
+            }
+          })
+        }
       } else {
+        const errorMsg = typeof authError === 'object' && authError.message ? authError.message : String(authError)
         return NextResponse.json(
-          { success: false, error: `Auth Error: ${authError.message}` },
+          { success: false, error: `Authentication Error: ${errorMsg}` },
           { status: 400 }
         )
       }
@@ -115,7 +141,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: newStaff })
   } catch (err: any) {
     console.error('Staff POST error:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    const errText = typeof err?.message === 'string' ? err.message : 'Failed to create staff member.'
+    return NextResponse.json({ success: false, error: errText }, { status: 500 })
   }
 }
 

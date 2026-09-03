@@ -37,6 +37,8 @@ interface PromoCode {
   usage_count: number
   included_product_ids: string[]
   excluded_product_ids: string[]
+  included_category_ids?: string[]
+  excluded_category_ids?: string[]
   is_active: boolean
   start_date: string
   end_date: string | null
@@ -50,6 +52,11 @@ interface ProductOption {
   images?: string[]
 }
 
+interface CategoryOption {
+  id: string
+  name: string
+}
+
 interface CustomerOption {
   id: string
   email: string
@@ -60,6 +67,7 @@ interface AdminPromotionsClientProps {
   initialPromotions: Promotion[]
   initialPromoCodes: PromoCode[]
   products: ProductOption[]
+  categories?: CategoryOption[]
   customers: CustomerOption[]
 }
 
@@ -67,6 +75,7 @@ export default function AdminPromotionsClient({
   initialPromotions,
   initialPromoCodes,
   products,
+  categories = [],
   customers
 }: AdminPromotionsClientProps) {
   const router = useRouter()
@@ -100,11 +109,15 @@ export default function AdminPromotionsClient({
   const [usageLimit, setUsageLimit] = useState<number>(0)
   const [includedProductIds, setIncludedProductIds] = useState<string[]>([])
   const [excludedProductIds, setExcludedProductIds] = useState<string[]>([])
+  const [includedCategoryIds, setIncludedCategoryIds] = useState<string[]>([])
+  const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([])
   const [codeIsActive, setCodeIsActive] = useState(true)
   const [codeStartDate, setCodeStartDate] = useState(new Date().toISOString().slice(0, 16))
   const [codeEndDate, setCodeEndDate] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [categorySearch, setCategorySearch] = useState('')
   const [productFilterMode, setProductFilterMode] = useState<'all' | 'include' | 'exclude'>('all')
+  const [categoryFilterMode, setCategoryFilterMode] = useState<'all' | 'include' | 'exclude'>('all')
   const [savingCode, setSavingCode] = useState(false)
 
   // Email Campaign State
@@ -219,10 +232,19 @@ export default function AdminPromotionsClient({
       setUsageLimit(code.usage_limit || 0)
       setIncludedProductIds(code.included_product_ids || [])
       setExcludedProductIds(code.excluded_product_ids || [])
+      setIncludedCategoryIds(code.included_category_ids || [])
+      setExcludedCategoryIds(code.excluded_category_ids || [])
       setProductFilterMode(
         (code.included_product_ids && code.included_product_ids.length > 0)
           ? 'include'
           : (code.excluded_product_ids && code.excluded_product_ids.length > 0)
+          ? 'exclude'
+          : 'all'
+      )
+      setCategoryFilterMode(
+        (code.included_category_ids && code.included_category_ids.length > 0)
+          ? 'include'
+          : (code.excluded_category_ids && code.excluded_category_ids.length > 0)
           ? 'exclude'
           : 'all'
       )
@@ -239,7 +261,10 @@ export default function AdminPromotionsClient({
       setUsageLimit(0)
       setIncludedProductIds([])
       setExcludedProductIds([])
+      setIncludedCategoryIds([])
+      setExcludedCategoryIds([])
       setProductFilterMode('all')
+      setCategoryFilterMode('all')
       setCodeIsActive(true)
       setCodeStartDate(new Date().toISOString().slice(0, 16))
       setCodeEndDate('')
@@ -266,6 +291,8 @@ export default function AdminPromotionsClient({
         usage_limit: Number(usageLimit),
         included_product_ids: productFilterMode === 'include' ? includedProductIds : [],
         excluded_product_ids: productFilterMode === 'exclude' ? excludedProductIds : [],
+        included_category_ids: categoryFilterMode === 'include' ? includedCategoryIds : [],
+        excluded_category_ids: categoryFilterMode === 'exclude' ? excludedCategoryIds : [],
         is_active: codeIsActive,
         start_date: codeStartDate || new Date().toISOString(),
         end_date: codeEndDate || null
@@ -357,6 +384,10 @@ export default function AdminPromotionsClient({
 
   const filteredProducts = products.filter((prod) =>
     prod.name.toLowerCase().includes(productSearch.toLowerCase())
+  )
+
+  const filteredCategories = categories.filter((cat) =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
   )
 
   return (
@@ -1234,6 +1265,106 @@ export default function AdminPromotionsClient({
                             </label>
                           )
                         })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Category Inclusion / Exclusion Filter */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="block text-xs font-bold text-slate-700 uppercase">
+                    Category Applicability
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCategoryFilterMode('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        categoryFilterMode === 'all'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All Categories
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryFilterMode('include')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        categoryFilterMode === 'include'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Only Specific Categories ({includedCategoryIds.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryFilterMode('exclude')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        categoryFilterMode === 'exclude'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Exclude Specific Categories ({excludedCategoryIds.length})
+                    </button>
+                  </div>
+
+                  {categoryFilterMode !== 'all' && (
+                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2 max-h-48 overflow-y-auto">
+                      <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs">
+                        <Search className="h-3.5 w-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Filter categories..."
+                          className="w-full outline-none text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        {filteredCategories.length === 0 ? (
+                          <div className="text-center py-3 text-xs text-slate-400">No categories found</div>
+                        ) : (
+                          filteredCategories.map((cat) => {
+                            const isSelected = categoryFilterMode === 'include'
+                              ? includedCategoryIds.includes(cat.id)
+                              : excludedCategoryIds.includes(cat.id)
+
+                            const toggle = () => {
+                              if (categoryFilterMode === 'include') {
+                                setIncludedCategoryIds(
+                                  isSelected
+                                    ? includedCategoryIds.filter((id) => id !== cat.id)
+                                    : [...includedCategoryIds, cat.id]
+                                )
+                              } else {
+                                setExcludedCategoryIds(
+                                  isSelected
+                                    ? excludedCategoryIds.filter((id) => id !== cat.id)
+                                    : [...excludedCategoryIds, cat.id]
+                                )
+                              }
+                            }
+
+                            return (
+                              <label
+                                key={cat.id}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 hover:border-brand-500 cursor-pointer text-xs"
+                              >
+                                <span className="font-semibold text-slate-800 truncate pr-2">{cat.name}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={toggle}
+                                  className="h-4 w-4 text-brand-600 rounded"
+                                />
+                              </label>
+                            )
+                          })
+                        )}
                       </div>
                     </div>
                   )}

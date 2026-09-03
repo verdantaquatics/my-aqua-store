@@ -42,27 +42,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This promo code has reached its maximum usage limit.' }, { status: 400 })
     }
 
-    // Filter cart items for eligible products
-    const includedIds = Array.isArray(promo.included_product_ids) ? promo.included_product_ids : []
-    const excludedIds = Array.isArray(promo.excluded_product_ids) ? promo.excluded_product_ids : []
+    // Filter cart items for eligible products & categories
+    const includedProdIds = Array.isArray(promo.included_product_ids) ? promo.included_product_ids : []
+    const excludedProdIds = Array.isArray(promo.excluded_product_ids) ? promo.excluded_product_ids : []
+    const includedCatIds = Array.isArray(promo.included_category_ids) ? promo.included_category_ids : []
+    const excludedCatIds = Array.isArray(promo.excluded_category_ids) ? promo.excluded_category_ids : []
 
-    let eligibleItems = cartItems
-    if (includedIds.length > 0) {
-      eligibleItems = eligibleItems.filter((item: any) => includedIds.includes(item.id))
-      if (eligibleItems.length === 0) {
-        return NextResponse.json({
-          error: 'This promo code is not applicable to the items currently in your cart.'
-        }, { status: 400 })
+    // Fetch category mapping from DB if category rules are present
+    const itemIds = cartItems.map((it: any) => it.id).filter(Boolean)
+    const productCategoryMap: Record<string, string> = {}
+    if (itemIds.length > 0 && (includedCatIds.length > 0 || excludedCatIds.length > 0)) {
+      const { data: dbProducts } = await supabase
+        .from('products')
+        .select('id, category_id')
+        .in('id', itemIds)
+      if (dbProducts) {
+        dbProducts.forEach((p: any) => {
+          if (p.category_id) productCategoryMap[p.id] = p.category_id
+        })
       }
     }
 
-    if (excludedIds.length > 0) {
-      eligibleItems = eligibleItems.filter((item: any) => !excludedIds.includes(item.id))
-      if (eligibleItems.length === 0) {
-        return NextResponse.json({
-          error: 'The items in your cart are excluded from this promotion.'
-        }, { status: 400 })
-      }
+    let eligibleItems = cartItems
+
+    // 1. Included Products Rule
+    if (includedProdIds.length > 0) {
+      eligibleItems = eligibleItems.filter((item: any) => includedProdIds.includes(item.id))
+    }
+
+    // 2. Included Categories Rule
+    if (includedCatIds.length > 0) {
+      eligibleItems = eligibleItems.filter((item: any) => {
+        const catId = item.category_id || productCategoryMap[item.id]
+        return catId && includedCatIds.includes(catId)
+      })
+    }
+
+    if ((includedProdIds.length > 0 || includedCatIds.length > 0) && eligibleItems.length === 0) {
+      return NextResponse.json({
+        error: 'This promo code is not applicable to the items currently in your cart.'
+      }, { status: 400 })
+    }
+
+    // 3. Excluded Products Rule
+    if (excludedProdIds.length > 0) {
+      eligibleItems = eligibleItems.filter((item: any) => !excludedProdIds.includes(item.id))
+    }
+
+    // 4. Excluded Categories Rule
+    if (excludedCatIds.length > 0) {
+      eligibleItems = eligibleItems.filter((item: any) => {
+        const catId = item.category_id || productCategoryMap[item.id]
+        return !catId || !excludedCatIds.includes(catId)
+      })
+    }
+
+    if (eligibleItems.length === 0) {
+      return NextResponse.json({
+        error: 'The items in your cart are excluded from this promotion.'
+      }, { status: 400 })
     }
 
     const eligibleSubtotal = eligibleItems.reduce(

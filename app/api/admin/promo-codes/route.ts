@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
       usage_limit,
       included_product_ids,
       excluded_product_ids,
+      included_category_ids,
+      excluded_category_ids,
       is_active,
       start_date,
       end_date
@@ -72,6 +74,8 @@ export async function POST(request: NextRequest) {
         usage_count: 0,
         included_product_ids: Array.isArray(included_product_ids) ? included_product_ids : [],
         excluded_product_ids: Array.isArray(excluded_product_ids) ? excluded_product_ids : [],
+        included_category_ids: Array.isArray(included_category_ids) ? included_category_ids : [],
+        excluded_category_ids: Array.isArray(excluded_category_ids) ? excluded_category_ids : [],
         is_active: is_active !== undefined ? Boolean(is_active) : true,
         start_date: start_date ? new Date(start_date).toISOString() : new Date().toISOString(),
         end_date: end_date ? new Date(end_date).toISOString() : null
@@ -113,6 +117,8 @@ export async function PUT(request: NextRequest) {
       usage_limit,
       included_product_ids,
       excluded_product_ids,
+      included_category_ids,
+      excluded_category_ids,
       is_active,
       start_date,
       end_date
@@ -132,6 +138,8 @@ export async function PUT(request: NextRequest) {
     if (usage_limit !== undefined) updates.usage_limit = Number(usage_limit)
     if (included_product_ids !== undefined) updates.included_product_ids = Array.isArray(included_product_ids) ? included_product_ids : []
     if (excluded_product_ids !== undefined) updates.excluded_product_ids = Array.isArray(excluded_product_ids) ? excluded_product_ids : []
+    if (included_category_ids !== undefined) updates.included_category_ids = Array.isArray(included_category_ids) ? included_category_ids : []
+    if (excluded_category_ids !== undefined) updates.excluded_category_ids = Array.isArray(excluded_category_ids) ? excluded_category_ids : []
     if (is_active !== undefined) updates.is_active = Boolean(is_active)
     if (start_date !== undefined) updates.start_date = start_date ? new Date(start_date).toISOString() : new Date().toISOString()
     if (end_date !== undefined) updates.end_date = end_date ? new Date(end_date).toISOString() : null
