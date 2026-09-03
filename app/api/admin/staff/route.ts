@@ -61,6 +61,35 @@ export async function POST(request: NextRequest) {
     const cleanRole = role === 'admin' || role === 'shop_owner' ? role : 'staff'
     const supabase = createAdminClient()
 
+    // Pre-check: Does staff member already exist in staff_members table?
+    const { data: existingStaff } = await supabase
+      .from('staff_members')
+      .select('id, full_name, email')
+      .eq('email', cleanEmail)
+      .maybeSingle()
+
+    if (existingStaff) {
+      return NextResponse.json(
+        { success: false, error: `A staff member with email "${cleanEmail}" already exists.` },
+        { status: 400 }
+      )
+    }
+
+    // Helper to format auth errors nicely
+    const formatAuthError = (err: any): string => {
+      if (!err) return 'Unknown authentication error'
+      if (typeof err === 'string' && err.trim().length > 0) return err
+      if (err.message && typeof err.message === 'string' && err.message.trim().length > 0) return err.message
+      if (err.error_description && typeof err.error_description === 'string') return err.error_description
+      if (err.msg && typeof err.msg === 'string') return err.msg
+      if (err.description && typeof err.description === 'string') return err.description
+      if (err.code === 'not_admin' || err.status === 403) {
+        return 'Supabase Service Role Key is invalid or unauthorized. Please verify SUPABASE_SERVICE_ROLE_KEY in your Vercel / environment settings.'
+      }
+      if (err.code) return `Supabase Auth Error (${err.code})`
+      return 'Failed to register credentials in authentication service.'
+    }
+
     // 1. Create User in Supabase Auth via Admin API
     let authUserId: string | null = null
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -75,38 +104,44 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       const authErrMsg = (authError.message || '').toLowerCase()
-      // If user already exists in auth.users
-      if (authErrMsg.includes('already registered') || authErrMsg.includes('already exists') || (authError as any).code === 'email_exists') {
-        // Check if user already exists in staff_members table
-        const { data: existingStaff } = await supabase
-          .from('staff_members')
-          .select('id')
-          .eq('email', cleanEmail)
-          .single()
+      const authErrCode = (authError as any).code || ''
 
-        if (existingStaff) {
-          return NextResponse.json(
-            { success: false, error: 'A staff member with this email already exists.' },
-            { status: 400 }
-          )
-        }
-
+      // If user already exists in auth.users (e.g. from customer signups or previous creation)
+      if (
+        authErrMsg.includes('already registered') ||
+        authErrMsg.includes('already exists') ||
+        authErrCode === 'email_exists' ||
+        authError.status === 422
+      ) {
         // Fetch auth user ID from Supabase auth users
-        const { data: usersData } = await supabase.auth.admin.listUsers()
-        const matched = usersData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail)
-        if (matched) {
-          authUserId = matched.id
-          // Update their password and role metadata
-          await supabase.auth.admin.updateUserById(matched.id, {
-            password: password,
-            user_metadata: {
-              full_name,
-              role: cleanRole
-            }
-          })
+        try {
+          const { data: usersData } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+          const matched = usersData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail)
+          if (matched) {
+            authUserId = matched.id
+            // Update their password and role metadata so they can log in
+            await supabase.auth.admin.updateUserById(matched.id, {
+              password: password,
+              email_confirm: true,
+              user_metadata: {
+                full_name,
+                role: cleanRole
+              }
+            })
+          }
+        } catch (findErr) {
+          console.warn('Could not list users for fallback ID matching:', findErr)
         }
+      } else if (authErrCode === 'not_admin' || authError.status === 403) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Authentication Error: Supabase Service Role Key unauthorized or missing. Please ensure SUPABASE_SERVICE_ROLE_KEY is set with your Supabase service_role secret key in Vercel environment variables.'
+          },
+          { status: 403 }
+        )
       } else {
-        const errorMsg = typeof authError === 'object' && authError.message ? authError.message : String(authError)
+        const errorMsg = formatAuthError(authError)
         return NextResponse.json(
           { success: false, error: `Authentication Error: ${errorMsg}` },
           { status: 400 }
