@@ -177,8 +177,15 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     social_linkedin TEXT DEFAULT '',
     -- Marketing, Ads & Tracking Pixels
     meta_pixel_id VARCHAR(100) DEFAULT '',
+    meta_conversions_api_token TEXT DEFAULT '',
+    meta_test_event_code VARCHAR(100) DEFAULT '',
+    meta_domain_verification VARCHAR(255) DEFAULT '',
     google_analytics_id VARCHAR(100) DEFAULT '',
+    google_tag_manager_id VARCHAR(100) DEFAULT '',
+    google_site_verification VARCHAR(255) DEFAULT '',
     tiktok_pixel_id VARCHAR(100) DEFAULT '',
+    tiktok_events_api_token TEXT DEFAULT '',
+    custom_head_scripts TEXT DEFAULT '',
     -- Special Collections (Featured, Best Seller, Trending)
     show_featured BOOLEAN DEFAULT TRUE,
     show_best_seller BOOLEAN DEFAULT TRUE,
@@ -191,6 +198,13 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     bkash_personal_name VARCHAR(255) DEFAULT '',
     bkash_personal_qr_url TEXT DEFAULT '',
     resend_api_key VARCHAR(255) DEFAULT '',
+    resend_from_email VARCHAR(255) DEFAULT '',
+    email_invoice_enabled BOOLEAN DEFAULT TRUE,
+    email_dispatched_enabled BOOLEAN DEFAULT TRUE,
+    email_cancelled_enabled BOOLEAN DEFAULT TRUE,
+    daily_digest_enabled BOOLEAN DEFAULT FALSE,
+    daily_digest_time VARCHAR(10) DEFAULT '20:00',
+    daily_digest_email VARCHAR(255) DEFAULT '',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bkash_personal_enabled BOOLEAN DEFAULT FALSE;
@@ -200,9 +214,18 @@ ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bkash_personal_qr_url
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS resend_api_key VARCHAR(255) DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS resend_from_email VARCHAR(255) DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS email_invoice_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS email_dispatched_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS email_cancelled_enabled BOOLEAN DEFAULT TRUE;
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_enabled BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_time VARCHAR(10) DEFAULT '20:00';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_email VARCHAR(255) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS meta_conversions_api_token TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS meta_test_event_code VARCHAR(100) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS meta_domain_verification VARCHAR(255) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_tag_manager_id VARCHAR(100) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_site_verification VARCHAR(255) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS tiktok_events_api_token TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS custom_head_scripts TEXT DEFAULT '';
 
 -- Seed Initial Default Store Settings Row
 INSERT INTO public.store_settings (
