@@ -319,6 +319,7 @@ export default function CheckoutPage() {
 
       // If guest chose to create an account, register customer before or with order
       let resolvedCustomerId = customer?.id || null
+      let resolvedUserId = customer?.user_id || null
       if (!customer && createAccount && customerEmail && accountPassword.length >= 6) {
         try {
           const authRes = await axios.post('/api/customer/auth', {
@@ -335,6 +336,9 @@ export default function CheckoutPage() {
           if (authRes.data?.customer?.id) {
             resolvedCustomerId = authRes.data.customer.id
           }
+          if (authRes.data?.customer?.user_id) {
+            resolvedUserId = authRes.data.customer.user_id
+          }
           if (authRes.data?.session) {
             refreshCustomer()
           }
@@ -344,6 +348,7 @@ export default function CheckoutPage() {
       }
 
       const payload = {
+        user_id: resolvedUserId,
         customer_id: resolvedCustomerId,
         customer_name: customerName,
         customer_phone: customerPhone,

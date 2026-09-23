@@ -86,6 +86,19 @@ export interface StoreSettings {
   tiktok_pixel_id: string
   tiktok_events_api_token: string
   custom_head_scripts: string
+  // Invoice Print Styling
+  invoice_print_colorful: boolean
+  // Hero Overlay Opacity (0-100)
+  hero_overlay_opacity: number
+  // Custom Watermark Image
+  watermark_image_url: string
+  // About Page Value Pillars
+  about_quality_title: string
+  about_quality_desc: string
+  about_delivery_title: string
+  about_delivery_desc: string
+  about_support_title: string
+  about_support_desc: string
   // Special Collections
   show_featured: boolean
   show_best_seller: boolean
@@ -143,6 +156,15 @@ export interface PublicStoreSettings {
   google_site_verification: string
   tiktok_pixel_id: string
   custom_head_scripts: string
+  invoice_print_colorful: boolean
+  hero_overlay_opacity: number
+  watermark_image_url: string
+  about_quality_title: string
+  about_quality_desc: string
+  about_delivery_title: string
+  about_delivery_desc: string
+  about_support_title: string
+  about_support_desc: string
   show_featured: boolean
   show_best_seller: boolean
   show_trending: boolean
@@ -223,6 +245,15 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   tiktok_pixel_id: '',
   tiktok_events_api_token: '',
   custom_head_scripts: '',
+  invoice_print_colorful: false,
+  hero_overlay_opacity: 35,
+  watermark_image_url: '',
+  about_quality_title: '',
+  about_quality_desc: '',
+  about_delivery_title: '',
+  about_delivery_desc: '',
+  about_support_title: '',
+  about_support_desc: '',
   show_featured: true,
   show_best_seller: true,
   show_trending: true,
@@ -303,6 +334,15 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       tiktok_pixel_id: data.tiktok_pixel_id ?? '',
       tiktok_events_api_token: data.tiktok_events_api_token ?? '',
       custom_head_scripts: data.custom_head_scripts ?? '',
+      invoice_print_colorful: data.invoice_print_colorful !== undefined ? Boolean(data.invoice_print_colorful) : DEFAULT_SETTINGS.invoice_print_colorful,
+      hero_overlay_opacity: data.hero_overlay_opacity !== undefined ? Number(data.hero_overlay_opacity) : DEFAULT_SETTINGS.hero_overlay_opacity,
+      watermark_image_url: data.watermark_image_url ?? '',
+      about_quality_title: data.about_quality_title ?? '',
+      about_quality_desc: data.about_quality_desc ?? '',
+      about_delivery_title: data.about_delivery_title ?? '',
+      about_delivery_desc: data.about_delivery_desc ?? '',
+      about_support_title: data.about_support_title ?? '',
+      about_support_desc: data.about_support_desc ?? '',
       show_featured: data.show_featured !== undefined ? Boolean(data.show_featured) : DEFAULT_SETTINGS.show_featured,
       show_best_seller: data.show_best_seller !== undefined ? Boolean(data.show_best_seller) : DEFAULT_SETTINGS.show_best_seller,
       show_trending: data.show_trending !== undefined ? Boolean(data.show_trending) : DEFAULT_SETTINGS.show_trending,
@@ -368,6 +408,15 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     google_site_verification: full.google_site_verification,
     tiktok_pixel_id: full.tiktok_pixel_id,
     custom_head_scripts: full.custom_head_scripts,
+    invoice_print_colorful: full.invoice_print_colorful,
+    hero_overlay_opacity: full.hero_overlay_opacity,
+    watermark_image_url: full.watermark_image_url,
+    about_quality_title: full.about_quality_title,
+    about_quality_desc: full.about_quality_desc,
+    about_delivery_title: full.about_delivery_title,
+    about_delivery_desc: full.about_delivery_desc,
+    about_support_title: full.about_support_title,
+    about_support_desc: full.about_support_desc,
     show_featured: full.show_featured,
     show_best_seller: full.show_best_seller,
     show_trending: full.show_trending,

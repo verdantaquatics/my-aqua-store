@@ -200,7 +200,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                 : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
-              <CreditCard className="h-4 w-4" /> Payment
+              <CreditCard className="h-4 w-4" /> Payment & Invoice
             </button>
             <button
               onClick={() => setActiveTab('shipping')}
@@ -327,6 +327,25 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   </button>
                 </div>
 
+                {/* Custom Watermark Image */}
+                {settings.watermark_enabled && (
+                  <div className="pt-4 border-t border-slate-100 space-y-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">
+                      Custom Watermark Image (Optional)
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Upload a dedicated watermark image. If left empty, your Site Logo will be used as the watermark.
+                    </p>
+                    <ImageUploader
+                      value={settings.watermark_image_url ? [settings.watermark_image_url] : []}
+                      maxImages={1}
+                      single={true}
+                      allowVideo={false}
+                      onChange={(urls) => setSettings({ ...settings, watermark_image_url: Array.isArray(urls) ? (urls[0] || '') : (urls || '') })}
+                    />
+                  </div>
+                )}
+
                 {/* 8 Curated Theme Color Palettes */}
                 <div className="pt-6 border-t border-slate-100 space-y-3">
                   <div>
@@ -439,6 +458,30 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       onChange={(urls) => setSettings({ ...settings, hero_image_url: Array.isArray(urls) ? (urls[0] || '') : (urls || '') })}
                     />
                   </div>
+
+                  {/* Hero Overlay Opacity Slider */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Hero Dark Overlay Opacity
+                    </label>
+                    <p className="text-[11px] text-slate-500 mb-3">
+                      Control how dark the overlay is over the hero banner image. Lower values = brighter image, higher = darker overlay for better text readability.
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={settings.hero_overlay_opacity ?? 35}
+                        onChange={(e) => setSettings({ ...settings, hero_overlay_opacity: Number(e.target.value) })}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
+                      />
+                      <span className="text-sm font-black text-brand-600 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-200 min-w-[50px] text-center">
+                        {settings.hero_overlay_opacity ?? 35}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Live Hero Preview (Right 5 Cols) */}
@@ -449,10 +492,14 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
                   <div className="relative overflow-hidden rounded-xl bg-slate-950 text-white p-6 shadow-xl aspect-[4/3] flex flex-col justify-end border border-slate-800">
                     <div
-                      className="absolute inset-0 bg-cover bg-center opacity-40"
+                      className="absolute inset-0 bg-cover bg-center"
                       style={{ backgroundImage: `url(${settings.hero_image_url || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=1600'})` }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+                    <div
+                      className="absolute inset-0"
+                      style={{ backgroundColor: `rgba(2, 6, 23, ${(settings.hero_overlay_opacity ?? 35) / 100})` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent" />
 
                     <div className="relative z-10 space-y-2">
                       {settings.hero_badge_text && (
@@ -1087,6 +1134,44 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                 </div>
 
               </div>
+
+              {/* Invoice Print Styling Section */}
+              <div className="max-w-2xl pt-6 border-t border-slate-200 space-y-4">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Invoice Print Styling</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Control whether invoices print with brand colors or in high-contrast black and white.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Colorful Print Mode</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        {settings.invoice_print_colorful
+                          ? 'Enabled: Invoice prints with brand colors, colored badges, and accents.'
+                          : 'Disabled: Invoice prints in high-contrast black & white for thermal/monochrome printers.'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.invoice_print_colorful}
+                      onClick={() => setSettings({ ...settings, invoice_print_colorful: !settings.invoice_print_colorful })}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.invoice_print_colorful ? 'bg-brand-600' : 'bg-slate-300'
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.invoice_print_colorful ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -1500,6 +1585,99 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       placeholder="Tell your customers about your brand, history, product quality, and values..."
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 leading-relaxed"
                     />
+                  </div>
+                )}
+
+                {/* About Page Value Pillars */}
+                {settings.about_enabled && (
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase">Value Pillars</h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Customize the three value propositions shown on your About page. Leave empty to use default translations.
+                      </p>
+                    </div>
+
+                    {/* Pillar 1: Quality */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 space-y-3">
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Pillar 1: Quality</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Title</label>
+                          <input
+                            type="text"
+                            value={settings.about_quality_title || ''}
+                            onChange={(e) => setSettings({ ...settings, about_quality_title: e.target.value })}
+                            placeholder="e.g. Premium Quality"
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={settings.about_quality_desc || ''}
+                            onChange={(e) => setSettings({ ...settings, about_quality_desc: e.target.value })}
+                            placeholder="Describe your quality commitment..."
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pillar 2: Delivery */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 space-y-3">
+                      <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Pillar 2: Delivery</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Title</label>
+                          <input
+                            type="text"
+                            value={settings.about_delivery_title || ''}
+                            onChange={(e) => setSettings({ ...settings, about_delivery_title: e.target.value })}
+                            placeholder="e.g. Nationwide Delivery"
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={settings.about_delivery_desc || ''}
+                            onChange={(e) => setSettings({ ...settings, about_delivery_desc: e.target.value })}
+                            placeholder="Describe your delivery reach..."
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pillar 3: Support */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 space-y-3">
+                      <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">Pillar 3: Support</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Title</label>
+                          <input
+                            type="text"
+                            value={settings.about_support_title || ''}
+                            onChange={(e) => setSettings({ ...settings, about_support_title: e.target.value })}
+                            placeholder="e.g. Dedicated Support"
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={settings.about_support_desc || ''}
+                            onChange={(e) => setSettings({ ...settings, about_support_desc: e.target.value })}
+                            placeholder="Describe your support..."
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

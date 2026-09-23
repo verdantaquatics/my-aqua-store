@@ -202,6 +202,15 @@ export const en = {
   about: {
     title: 'About Us',
     subtitle: 'Learn more about our journey, mission, and commitment to quality.',
+    about_us: 'About Us',
+    story_mission: 'Our Story & Mission',
+    quality: 'Premium Quality',
+    quality_desc: 'Every product is carefully tested and hand-inspected for highest quality.',
+    delivery_nationwide: 'Nationwide Delivery',
+    delivery_desc: 'Fast and reliable doorstep delivery across all 64 districts of Bangladesh.',
+    support: 'Dedicated Support',
+    support_desc: 'Friendly customer assistance available for consultations and questions.',
+    visit_us: 'Visit Us',
     get_in_touch: 'Get in Touch',
     visit_store: 'Visit Our Location',
     social_profiles: 'Connect With Us On Social Media',
@@ -231,7 +240,10 @@ export const en = {
     privacy_policy: 'Privacy Policy',
     terms: 'Terms of Service',
     return_policy: 'Exchange & Return Policy',
-    follow_us: 'Follow Us'
+    follow_us: 'Follow Us',
+    categories: 'Categories',
+    contact_support: 'Contact & Support',
+    connect_with_us: 'Connect With Us'
   },
   admin: {
     dashboard: 'Dashboard',

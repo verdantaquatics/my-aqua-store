@@ -127,9 +127,8 @@ export async function POST(request: NextRequest) {
       // Retroactively link any guest orders with matching phone or email
       await adminDb
         .from('orders')
-        .update({ customer_id: customerId })
+        .update({ customer_id: customerId, user_id: userId })
         .or(`customer_phone.eq.${cleanPhone},customer_email.ilike.${cleanEmail}`)
-        .is('customer_id', null)
 
       // Automatically sign in the new customer to generate session
       const userClient = await createClient()
@@ -204,6 +203,15 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
+
+      if (customerRecord) {
+        // Retroactively link any unlinked orders with matching email or phone
+        await adminDb
+          .from('orders')
+          .update({ customer_id: customerRecord.id, user_id: signInData.user.id })
+          .or(`customer_phone.eq.${customerRecord.phone},customer_email.ilike.${emailToAuth}`)
+          .is('user_id', null)
+      }
 
       return NextResponse.json({
         success: true,

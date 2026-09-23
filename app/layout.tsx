@@ -10,6 +10,7 @@ import TrackingScripts from '@/components/TrackingScripts'
 import PromoRibbon from '@/components/PromoRibbon'
 import PromoBanner from '@/components/PromoBanner'
 import AuthModal from '@/components/AuthModal'
+import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { getPublicSettings } from '@/utils/settings'
 import { createAdminClient } from '@/utils/supabase/server'
 
@@ -88,6 +89,7 @@ export default async function RootLayout({
                   <PromoRibbon ribbon={activeRibbon} />
                   <PromoBanner banner={activeBanner} />
                   <AuthModal />
+                  <FloatingActionButtons />
                   {children}
                 </CartProvider>
               </CustomerProvider>

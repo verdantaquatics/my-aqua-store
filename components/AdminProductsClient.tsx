@@ -13,7 +13,7 @@ import {
   BarChart3, ShoppingBag, Package, LogOut, Plus, Trash2, Edit2,
   X, Check, Sparkles, FolderTree, Settings, ShieldCheck, ChevronRight,
   Layers, Upload, AlertCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Flame, Award,
-  Search
+  Search, Loader2
 } from 'lucide-react'
 
 export interface Category {
@@ -128,6 +128,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
   const [isFeatured, setIsFeatured] = useState(false)
   const [isBestSeller, setIsBestSeller] = useState(false)
   const [isTrending, setIsTrending] = useState(false)
+  const [uploadingVariantKey, setUploadingVariantKey] = useState<string | null>(null)
 
   // Editing Fields
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -293,7 +294,16 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     const finalStock = computeTotalStock(variationOptions, stock)
 
     const variationsPayload = {
-      options: variationOptions.filter((opt) => opt.name.trim() && opt.values.length > 0),
+      options: variationOptions
+        .filter((opt) => opt.name.trim() && opt.values.length > 0)
+        .map((opt) => ({
+          ...opt,
+          values: opt.values.filter((v) => v.label.trim()).map((v) => ({
+            ...v,
+            image_url: v.image_url || ''
+          }))
+        }))
+        .filter((opt) => opt.values.length > 0),
       category_ids: selectedCategoryIds
     }
 
@@ -379,7 +389,16 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     const finalStock = computeTotalStock(editVariationOptions, editStock)
 
     const variationsPayload = {
-      options: editVariationOptions.filter((opt) => opt.name.trim() && opt.values.length > 0),
+      options: editVariationOptions
+        .filter((opt) => opt.name.trim() && opt.values.length > 0)
+        .map((opt) => ({
+          ...opt,
+          values: opt.values.filter((v) => v.label.trim()).map((v) => ({
+            ...v,
+            image_url: v.image_url || ''
+          }))
+        }))
+        .filter((opt) => opt.values.length > 0),
       category_ids: editCategoryIds
     }
 
@@ -531,7 +550,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                     <span className="col-span-4">Value Label</span>
                     <span className="col-span-2 text-center">Stock</span>
                     <span className="col-span-3 text-center">Variant Price (৳)</span>
-                    <span className="col-span-2">Photo</span>
+                    <span className="col-span-2">Photo <span className="text-slate-300">(Opt.)</span></span>
                     <span className="col-span-1"></span>
                   </div>
 
@@ -591,6 +610,11 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                               Clear
                             </button>
                           </div>
+                        ) : uploadingVariantKey === `${optIdx}-${valIdx}` ? (
+                          <div className="inline-flex items-center gap-1 text-[10px] text-brand-600 bg-brand-50 px-1.5 py-1 rounded font-medium">
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                            <span>Uploading...</span>
+                          </div>
                         ) : (
                           <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-1.5 py-1 rounded font-medium transition">
                             <Upload className="h-2.5 w-2.5" />
@@ -602,15 +626,26 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                               onChange={async (e) => {
                                 const file = e.target.files?.[0]
                                 if (!file) return
-                                const formData = new FormData()
-                                formData.append('file', file)
-                                formData.append('folder', 'variations')
-                                const res = await fetch('/api/upload', { method: 'POST', body: formData })
-                                const data = await res.json()
-                                if (data.url) {
+                                const key = `${optIdx}-${valIdx}`
+                                setUploadingVariantKey(key)
+                                try {
+                                  const formData = new FormData()
+                                  formData.append('file', file)
+                                  formData.append('folder', 'variations')
+                                  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+                                  const data = await res.json()
+                                  if (!res.ok || !data.url) {
+                                    alert(data.error || 'Image upload failed. Please try a smaller file or different format.')
+                                    return
+                                  }
                                   const updated = [...options]
                                   updated[optIdx].values[valIdx].image_url = data.url
                                   setOptions(updated)
+                                } catch (err: any) {
+                                  alert(`Upload error: ${err.message || 'Network error'}`)
+                                } finally {
+                                  setUploadingVariantKey(null)
+                                  e.target.value = ''
                                 }
                               }}
                             />

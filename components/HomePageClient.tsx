@@ -139,11 +139,15 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       <section className="relative overflow-hidden bg-slate-950 text-white py-24 sm:py-32">
         {settings.hero_image_url && (
           <div 
-            className="absolute inset-0 z-0 opacity-40 bg-cover bg-center"
+            className="absolute inset-0 z-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${settings.hero_image_url})` }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-transparent z-0" />
+        <div 
+          className="absolute inset-0 z-[1]"
+          style={{ backgroundColor: `rgba(2, 6, 23, ${((settings as any).hero_overlay_opacity ?? 35) / 100})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent z-[1]" />
         
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">

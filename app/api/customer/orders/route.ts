@@ -30,7 +30,17 @@ export async function GET() {
       conditions.push(`customer_id.eq.${customer.id}`)
     }
     if (customer?.phone) {
+      // Normalize phone: extract digits, handle +88, 88, and local 01... formats
+      const rawDigits = customer.phone.replace(/\D/g, '')
+      const localPhone = rawDigits.startsWith('88') ? rawDigits.slice(2) : rawDigits
+      const intlPhone = rawDigits.startsWith('88') ? rawDigits : '88' + rawDigits
+      const plusIntlPhone = '+' + intlPhone
+
+      // Match any of the formats the phone might be stored in
       conditions.push(`customer_phone.eq.${customer.phone}`)
+      if (localPhone !== customer.phone) conditions.push(`customer_phone.eq.${localPhone}`)
+      if (intlPhone !== customer.phone) conditions.push(`customer_phone.eq.${intlPhone}`)
+      if (plusIntlPhone !== customer.phone) conditions.push(`customer_phone.eq.${plusIntlPhone}`)
     }
 
     // 2. Fetch orders

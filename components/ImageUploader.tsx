@@ -176,7 +176,8 @@ export default function ImageUploader({
         if (single) {
           setProgressText(`Uploading ${file.name}...`)
           if (file.type.startsWith('image/')) {
-            file = await compressImage(file, settings?.logo_url, settings?.watermark_enabled)
+            const wmUrl = folder !== 'branding' ? (settings?.watermark_image_url || settings?.logo_url) : undefined
+            file = await compressImage(file, wmUrl, folder !== 'branding' ? settings?.watermark_enabled : false)
           }
           const uploadedUrl = await uploadSingleFile(file, folder)
           if (uploadedUrl) {
@@ -206,7 +207,8 @@ export default function ImageUploader({
             continue
           }
           setProgressText(`Processing ${file.name}...`)
-          const processedFile = await compressImage(file, settings?.logo_url, settings?.watermark_enabled)
+          const wmUrl = folder !== 'branding' ? (settings?.watermark_image_url || settings?.logo_url) : undefined
+          const processedFile = await compressImage(file, wmUrl, folder !== 'branding' ? settings?.watermark_enabled : false)
           setProgressText(`Uploading ${file.name}...`)
           const uploadedUrl = await uploadSingleFile(processedFile, folder)
           if (uploadedUrl) newUrls.push(uploadedUrl)
@@ -305,9 +307,6 @@ export default function ImageUploader({
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span>Image active & saved</span>
             </div>
-            <p className="text-[11px] text-slate-500 truncate max-w-full font-mono">
-              {currentItems[0]}
-            </p>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
               <button
                 type="button"

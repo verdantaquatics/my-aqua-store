@@ -149,9 +149,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">{t('about.quality')}</h3>
+            <h3 className="text-sm font-bold text-slate-900">{settings.about_quality_title || t('about.quality')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              {t('about.quality_desc')}
+              {settings.about_quality_desc || t('about.quality_desc')}
             </p>
           </div>
 
@@ -159,9 +159,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <Truck className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">{t('about.delivery_nationwide')}</h3>
+            <h3 className="text-sm font-bold text-slate-900">{settings.about_delivery_title || t('about.delivery_nationwide')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              {t('about.delivery_desc')}
+              {settings.about_delivery_desc || t('about.delivery_desc')}
             </p>
           </div>
 
@@ -169,9 +169,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <HeartHandshake className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">{t('about.support')}</h3>
+            <h3 className="text-sm font-bold text-slate-900">{settings.about_support_title || t('about.support')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              {t('about.support_desc')}
+              {settings.about_support_desc || t('about.support_desc')}
             </p>
           </div>
         </div>

@@ -206,12 +206,12 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
     <div className="group relative flex flex-col overflow-visible rounded-xl sm:rounded-2xl border border-slate-200 bg-white hover:shadow-xl hover:border-brand-300 transition-all duration-300">
       
       {/* Image wrapper */}
-      <Link href={`/product/${product.slug}`} className="relative aspect-square w-full overflow-hidden rounded-t-xl sm:rounded-t-2xl bg-slate-100 block">
+      <Link href={`/product/${product.slug}`} className="relative aspect-square w-full overflow-hidden rounded-t-xl sm:rounded-t-2xl bg-white block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5'}
           alt={product.name}
-          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+          className="h-full w-full object-contain object-center p-2 group-hover:scale-105 transition-transform duration-500"
         />
         
         {product.old_price && product.old_price > 0 ? (

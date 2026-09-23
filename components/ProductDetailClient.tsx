@@ -76,6 +76,8 @@ export default function ProductDetailClient({ product, categories, relatedProduc
   )
   const [quantity, setQuantity] = useState<number>(1)
   const [cartDrawerOpen, setCartDrawerOpen] = useState<boolean>(false)
+  const [isZooming, setIsZooming] = useState(false)
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 })
 
   const isVideo = (url: string) => /\.(mp4|webm|mov|ogg)(\?.*)?$/i.test(url)
 
@@ -88,6 +90,9 @@ export default function ProductDetailClient({ product, categories, relatedProduc
     const valObj = group?.values.find((v) => v.label === valueLabel)
     if (valObj?.image_url) {
       setSelectedMedia(valObj.image_url)
+    } else {
+      // Fallback to primary product image when variant has no image
+      setSelectedMedia(product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5')
     }
   }
 
@@ -165,7 +170,17 @@ export default function ProductDetailClient({ product, categories, relatedProduc
           
           {/* MEDIA SECTION */}
           <div className="space-y-4">
-            <div className="aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm flex items-center justify-center">
+            <div
+              className="aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-center relative cursor-zoom-in"
+              onMouseEnter={() => setIsZooming(true)}
+              onMouseLeave={() => { setIsZooming(false); setZoomOrigin({ x: 50, y: 50 }) }}
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                const x = ((e.clientX - rect.left) / rect.width) * 100
+                const y = ((e.clientY - rect.top) / rect.height) * 100
+                setZoomOrigin({ x, y })
+              }}
+            >
               {isVideo(selectedMedia) ? (
                 <video
                   src={selectedMedia}
@@ -178,7 +193,11 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                 <img
                   src={selectedMedia}
                   alt={product.name}
-                  className="h-full w-full object-cover object-center"
+                  className="h-full w-full object-contain p-2 transition-transform duration-300 ease-out"
+                  style={{
+                    transform: isZooming ? 'scale(2)' : 'scale(1)',
+                    transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`
+                  }}
                 />
               )}
             </div>

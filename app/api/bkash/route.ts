@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Branch 2: NEW ORDER CREATION
     const { 
+      user_id,
       customer_id,
       customer_name, 
       customer_phone, 
@@ -121,6 +122,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required order details' }, { status: 400 })
     }
 
+    // Auto-resolve customer_id & user_id if not explicitly provided
+    let finalCustomerId = customer_id || null
+    let finalUserId = user_id || null
+
+    if (!finalCustomerId || !finalUserId) {
+      try {
+        const cleanPhone = (customer_phone || '').replace(/\D/g, '')
+        const shortPhone = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone
+        const cleanEmail = (customer_email || '').trim().toLowerCase()
+
+        const matchConditions: string[] = []
+        if (cleanEmail) matchConditions.push(`email.ilike.${cleanEmail}`)
+        if (shortPhone) matchConditions.push(`phone.ilike.%${shortPhone}%`)
+
+        if (matchConditions.length > 0) {
+          const { data: matchedCust } = await supabase
+            .from('customers')
+            .select('id, user_id')
+            .or(matchConditions.join(','))
+            .limit(1)
+
+          if (matchedCust && matchedCust.length > 0) {
+            if (!finalCustomerId) finalCustomerId = matchedCust[0].id
+            if (!finalUserId) finalUserId = matchedCust[0].user_id || null
+          }
+        }
+      } catch (err) {
+        console.warn('Customer resolution note:', err)
+      }
+    }
+
     const isBkashPersonal = payment_method === 'BKASH_PERSONAL'
     const initialPaymentStatus = isBkashPersonal ? 'Pending Verification' : 'Pending'
 
@@ -128,7 +160,8 @@ export async function POST(request: NextRequest) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
-        customer_id: customer_id || null,
+        user_id: finalUserId,
+        customer_id: finalCustomerId,
         customer_name,
         customer_phone,
         customer_email,
