@@ -88,9 +88,7 @@ async function performCourierSync(): Promise<{
     .from('orders')
     .select('*')
     .or('steadfast_consignment_id.not.is.null,pathao_consignment_id.not.is.null')
-    .neq('status', 'Delivered')
-    .neq('status', 'Completed')
-    .neq('status', 'Cancelled')
+    .not('order_status', 'in', '(Delivered,Completed,Cancelled)')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -116,7 +114,7 @@ async function performCourierSync(): Promise<{
     const consignmentId = order.steadfast_consignment_id || order.pathao_consignment_id || ''
     const trackingCode = order.steadfast_tracking_code || ''
 
-    const currentOrderStatus = order.order_status || order.status || 'Pending'
+    const currentOrderStatus = order.order_status || 'Pending'
     const currentPaymentStatus = order.payment_status || 'Pending'
 
     try {
@@ -174,7 +172,6 @@ async function performCourierSync(): Promise<{
 
         const updatePayload: Record<string, any> = {
           order_status: newOrderStatus,
-          status: newOrderStatus,
           payment_details: updatedPaymentDetails
         }
 
@@ -185,10 +182,12 @@ async function performCourierSync(): Promise<{
           updatePayload.pathao_status = mapping.courier_status_slug
         }
 
-        await supabase
+        const { error: updateErr } = await supabase
           .from('orders')
           .update(updatePayload)
           .eq('id', order.id)
+
+        if (updateErr) throw new Error(`Failed to save synced status: ${updateErr.message}`)
       }
 
       return {
