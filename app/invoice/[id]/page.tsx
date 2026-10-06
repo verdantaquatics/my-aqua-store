@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { getPublicSettings } from '@/utils/settings'
+import { formatOrderNumber } from '@/utils/order-number'
 import { notFound } from 'next/navigation'
 import InvoiceClient from './InvoiceClient'
 
@@ -12,7 +13,7 @@ interface InvoicePageProps {
 export async function generateMetadata({ params }: InvoicePageProps) {
   const { id } = await params
   const settings = await getPublicSettings()
-  const shortId = id.slice(0, 8).toUpperCase()
+  const shortId = formatOrderNumber(id)
   return {
     title: `Invoice-${shortId} - ${settings.store_name}`,
     description: `Official order invoice #${shortId} from ${settings.store_name}`

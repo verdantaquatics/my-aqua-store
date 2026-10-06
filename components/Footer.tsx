@@ -140,7 +140,7 @@ export default function Footer() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-xs font-bold transition shadow-sm"
-                      title="Chat on WhatsApp"
+                      title={isBangla ? 'হোয়াটসঅ্যাপে চ্যাট করুন' : 'Chat on WhatsApp'}
                     >
                       <MessageCircle className="h-4 w-4" />
                       <span>WhatsApp</span>
@@ -275,7 +275,7 @@ export default function Footer() {
 
         {/* Copyright */}
         <div className="mt-12 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {isBangla ? toBengaliDigits(new Date().getFullYear()) : new Date().getFullYear()} {settings.store_name}. {t('footer.all_rights_reserved')}</p>
+          <p>© {isBangla ? toBengaliDigits(new Date().getFullYear()) : new Date().getFullYear()} {settings.store_name}. {t('footer.rights_reserved')}</p>
           <p className="text-[11px] text-slate-600">
             {settings.store_name} • E-Commerce Platform
           </p>

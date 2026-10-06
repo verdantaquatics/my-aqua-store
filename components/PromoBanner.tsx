@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLanguage } from '@/context/LanguageContext'
 import { X, Sparkles, ArrowRight } from 'lucide-react'
 
 interface Promotion {
@@ -27,6 +28,7 @@ const COOLDOWN_HOURS = 24
 export default function PromoBanner({ banner }: PromoBannerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
+  const { isBangla } = useLanguage()
 
   useEffect(() => {
     if (!banner || !banner.is_active || !banner.image_url) return
@@ -109,7 +111,7 @@ export default function PromoBanner({ banner }: PromoBannerProps) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-brand-600 text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Special Promotion</span>
+                <span>{isBangla ? 'বিশেষ অফার' : 'Special Promotion'}</span>
               </div>
               {banner.title && (
                 <h4 className="font-extrabold text-sm text-slate-900 truncate mt-0.5">
@@ -124,7 +126,7 @@ export default function PromoBanner({ banner }: PromoBannerProps) {
                 onClick={handleDismiss}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md transition whitespace-nowrap"
               >
-                <span>Shop Now</span>
+                <span>{isBangla ? 'এখনই কিনুন' : 'Shop Now'}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             ) : (

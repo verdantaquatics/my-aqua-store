@@ -28,8 +28,11 @@ export default async function FeaturedCollectionPage() {
   return (
     <CollectionPageClient
       title="Featured Products"
+      titleBn="ফিচার্ড পণ্য"
       subtitle="Carefully curated and hand-picked showcase items recommended by our store."
+      subtitleBn="আমাদের স্টোরের বাছাই করা ও সুপারিশকৃত বিশেষ পণ্যসমূহ।"
       badgeText="Curated Showcase"
+      badgeTextBn="বাছাইকৃত সংগ্রহ"
       badgeColorClass="bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
       products={toListingProducts(products)}
       categories={categories || []}

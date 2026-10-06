@@ -181,7 +181,7 @@ export const en = {
   },
   invoice: {
     invoice: 'INVOICE',
-    invoice_id: 'Invoice ID',
+    invoice_id: 'Order / Invoice No',
     billed_to: 'Billed To',
     shipping_destination: 'Shipping Destination',
     item_description: 'Item Description',
@@ -197,7 +197,7 @@ export const en = {
     print_invoice: 'Print / Save PDF',
     back_to_store: 'Back to Store',
     thank_you: 'Thank you for shopping with',
-    query_note: 'For parcel queries or tracking, quote your Invoice ID:'
+    query_note: 'For parcel queries or tracking, quote your Order No:'
   },
   about: {
     title: 'About Us',
@@ -226,6 +226,8 @@ export const en = {
     email: 'Email Address',
     phone: 'Phone Number',
     message: 'Your Message',
+    subject: 'Subject',
+    contact_info: 'Contact Information',
     send_btn: 'Send Message',
     sending: 'Sending...',
     message_sent: 'Thank you! Your message has been sent successfully.',

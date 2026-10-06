@@ -181,7 +181,7 @@ export const bn = {
   },
   invoice: {
     invoice: 'চালান / ইনভয়েস',
-    invoice_id: 'ইনভয়েস নং',
+    invoice_id: 'অর্ডার / ইনভয়েস নং',
     billed_to: 'বিল প্রাপক',
     shipping_destination: 'ডেলিভারি ঠিকানা',
     item_description: 'পণ্যের বিবরণ',
@@ -197,7 +197,7 @@ export const bn = {
     print_invoice: 'প্রিন্ট / PDF সংরক্ষণ',
     back_to_store: 'দোকানে ফিরে যান',
     thank_you: 'আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ',
-    query_note: 'যেকোনো প্রয়োজনে আপনার ইনভয়েস নম্বরটি উল্লেখ করুন:'
+    query_note: 'যেকোনো প্রয়োজনে আপনার অর্ডার নম্বরটি উল্লেখ করুন:'
   },
   about: {
     title: 'আমাদের সম্পর্কে',
@@ -226,6 +226,8 @@ export const bn = {
     email: 'ইমেইল অ্যাড্রেস',
     phone: 'মোবাইল নম্বর',
     message: 'আপনার বার্তা লিখুন',
+    subject: 'বিষয়',
+    contact_info: 'যোগাযোগের তথ্য',
     send_btn: 'বার্তা পাঠান',
     sending: 'পাঠানো হচ্ছে...',
     message_sent: 'ধন্যবাদ! আপনার বার্তাটি সফলভাবে পাঠানো হয়েছে।',

@@ -1195,7 +1195,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                               type="text"
                               value={settings.bkash_personal_name || ''}
                               onChange={(e) => setSettings({ ...settings, bkash_personal_name: e.target.value })}
-                              placeholder="e.g. Sadman Sakib"
+                              placeholder="e.g. Rahim Ahmed"
                               className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
                             />
                           </div>

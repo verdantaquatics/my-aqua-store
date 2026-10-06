@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { ArrowUp, MessageCircle } from 'lucide-react'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
 
 export default function FloatingActionButtons() {
   const pathname = usePathname()
   const { settings } = useStore()
+  const { isBangla } = useLanguage()
   const [showGoTop, setShowGoTop] = useState(false)
 
   // Hide on admin routes and on the printable invoice (it was overlaying / printing onto invoices)
@@ -46,8 +48,8 @@ export default function FloatingActionButtons() {
         className={`flex h-11 w-11 items-center justify-center rounded-full bg-slate-800/80 backdrop-blur-sm text-white shadow-lg hover:bg-slate-700 transition-all duration-300 ${
           showGoTop ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-75 pointer-events-none'
         }`}
-        aria-label="Scroll to top"
-        title="Back to Top"
+        aria-label={isBangla ? 'উপরে যান' : 'Scroll to top'}
+        title={isBangla ? 'উপরে যান' : 'Back to Top'}
       >
         <ArrowUp className="h-5 w-5" />
       </button>
@@ -60,8 +62,8 @@ export default function FloatingActionButtons() {
           rel="noopener noreferrer"
           className="group relative flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95"
           style={{ backgroundColor: '#25D366' }}
-          aria-label="Chat with us on WhatsApp"
-          title="Chat with Us"
+          aria-label={isBangla ? 'হোয়াটসঅ্যাপে আমাদের সাথে চ্যাট করুন' : 'Chat with us on WhatsApp'}
+          title={isBangla ? 'আমাদের সাথে চ্যাট করুন' : 'Chat with Us'}
         >
           {/* Pulse ring */}
           <span className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ backgroundColor: '#25D366' }} />
@@ -76,7 +78,7 @@ export default function FloatingActionButtons() {
 
           {/* Tooltip */}
           <span className="absolute right-full mr-3 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            Chat with Us
+            {isBangla ? 'আমাদের সাথে চ্যাট করুন' : 'Chat with Us'}
           </span>
         </a>
       )}

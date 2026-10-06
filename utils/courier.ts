@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getStoreSettings } from '@/utils/settings'
+import { formatOrderNumber } from '@/utils/order-number'
 
 // ==========================================
 // 1. PATHAO COURIER HELPERS
@@ -147,7 +148,7 @@ export async function bookSteadfastConsignment(order: any, codAmount: number) {
   }
 
   const baseUrl = steadfast_base_url?.replace(/\/$/, '') || 'https://portal.steadfast.com.bd/api/v1'
-  const invoiceNumber = `INV-${order.id.slice(0, 8).toUpperCase()}`
+  const invoiceNumber = formatOrderNumber(order.id)
 
   // Enrich address with city/zone/area details for Steadfast's AI Thana/Police Station auto-detection
   const extraLocations = [

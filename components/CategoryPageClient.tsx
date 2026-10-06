@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import ProductCard from '@/components/ProductCard'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
 import { getDescendantIds } from '@/utils/categories'
 
 interface Product {
@@ -43,6 +44,7 @@ interface CategoryPageClientProps {
 
 export default function CategoryPageClient({ category, allCategories, initialProducts }: CategoryPageClientProps) {
   const { settings } = useStore()
+  const { t, isBangla } = useLanguage()
   const [products] = useState<Product[]>(initialProducts)
   const [categories] = useState<Category[]>(allCategories)
   
@@ -92,7 +94,7 @@ export default function CategoryPageClient({ category, allCategories, initialPro
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-              <Link href="/" className="hover:text-brand-400">Home</Link>
+              <Link href="/" className="hover:text-brand-400">{t('nav.home')}</Link>
               <ChevronRight className="h-3 w-3" />
               {parentCategory && (
                 <>
@@ -107,7 +109,7 @@ export default function CategoryPageClient({ category, allCategories, initialPro
               {category.name}
             </h1>
             <p className="mt-4 text-sm sm:text-base leading-relaxed text-slate-300">
-              {category.description || `Browse our full inventory of ${category.name}.`}
+              {category.description || (isBangla ? `${category.name} ক্যাটাগরির সকল পণ্য দেখুন।` : `Browse our full inventory of ${category.name}.`)}
             </p>
           </div>
         </div>
@@ -168,8 +170,8 @@ export default function CategoryPageClient({ category, allCategories, initialPro
         {filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300 my-6">
             <Filter className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-base font-bold text-slate-900">No products found</p>
-            <p className="mt-1 text-xs text-slate-500">There are no items currently listed in this category selection.</p>
+            <p className="text-base font-bold text-slate-900">{isBangla ? 'কোনো পণ্য পাওয়া যায়নি' : 'No products found'}</p>
+            <p className="mt-1 text-xs text-slate-500">{isBangla ? 'এই ক্যাটাগরিতে বর্তমানে কোনো পণ্য নেই।' : 'There are no items currently listed in this category selection.'}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 my-6">

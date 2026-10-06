@@ -193,8 +193,8 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
             <Link
               href="/account?tab=wishlist"
               className="relative hidden sm:inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 hover:border-pink-300 hover:bg-pink-50 text-slate-700 hover:text-pink-600 transition shadow-sm"
-              title="Wishlist"
-              aria-label="Wishlist"
+              title={isBangla ? 'উইশলিস্ট' : 'Wishlist'}
+              aria-label={isBangla ? 'উইশলিস্ট' : 'Wishlist'}
             >
               <Heart className="h-4 w-4" />
               {wishlistCount > 0 && (
@@ -212,8 +212,8 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                 if (mobileMenuOpen) setMobileMenuOpen(false)
               }}
               className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden border border-slate-200"
-              aria-label="Search"
-              title="Search"
+              aria-label={isBangla ? 'খুঁজুন' : 'Search'}
+              title={isBangla ? 'খুঁজুন' : 'Search'}
             >
               <Search className="h-4 w-4 text-slate-700" />
             </button>
@@ -224,8 +224,8 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                 <Link
                   href="/account"
                   className="flex items-center justify-center gap-1.5 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3 py-0 sm:py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold transition shadow-sm"
-                  title="My Account"
-                  aria-label="My Account"
+                  title={isBangla ? 'আমার অ্যাকাউন্ট' : 'My Account'}
+                  aria-label={isBangla ? 'আমার অ্যাকাউন্ট' : 'My Account'}
                 >
                   <User className="h-4 w-4 text-brand-600" />
                   <span className="max-w-[80px] truncate hidden md:inline-block">
@@ -238,8 +238,8 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   type="button"
                   onClick={() => openAuthModal('login')}
                   className="flex items-center justify-center gap-1 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3 py-0 sm:py-2 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50 text-slate-700 hover:text-brand-700 text-xs font-bold transition shadow-sm"
-                  title="Sign In"
-                  aria-label="Sign In"
+                  title={isBangla ? 'লগইন' : 'Sign In'}
+                  aria-label={isBangla ? 'লগইন' : 'Sign In'}
                 >
                   <User className="h-4 w-4" />
                   <span className="hidden md:inline-block">{isBangla ? 'লগইন' : 'Sign In'}</span>
@@ -296,8 +296,8 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
               onClick={onCartToggle}
               className="relative flex items-center justify-center gap-1.5 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-900 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3.5 py-0 sm:py-2 text-xs font-bold transition-all shadow-sm"
               id="cart-trigger"
-              aria-label="Shopping Cart"
-              title="Cart"
+              aria-label={isBangla ? 'শপিং কার্ট' : 'Shopping Cart'}
+              title={isBangla ? 'কার্ট' : 'Cart'}
             >
               <ShoppingBag className="h-4 w-4 text-brand-700" />
               <span className="tracking-wide hidden sm:inline">{t('nav.cart')}</span>

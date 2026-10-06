@@ -113,7 +113,7 @@ export default function AuthModal() {
 
           <div className="flex items-center gap-2 text-brand-400 text-xs font-bold uppercase tracking-wider mb-1">
             <ShieldCheck className="h-4 w-4" />
-            <span>Customer Portal</span>
+            <span>{isBangla ? 'গ্রাহক পোর্টাল' : 'Customer Portal'}</span>
           </div>
 
           <h3 className="text-xl font-black tracking-tight text-white">
@@ -237,7 +237,7 @@ export default function AuthModal() {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Sadman Sakib"
+                    placeholder={isBangla ? "যেমন: রহিম আহমেদ" : "e.g. Rahim Ahmed"}
                     className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10"
                   />
                 </div>

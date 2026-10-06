@@ -51,8 +51,11 @@ export default async function TrendingCollectionPage() {
   return (
     <CollectionPageClient
       title="Trending Products"
+      titleBn="জনপ্রিয় পণ্য"
       subtitle="The hottest products generating the most interest and sales over the past 30 days."
+      subtitleBn="গত ৩০ দিনে সবচেয়ে বেশি আগ্রহ ও বিক্রি হওয়া পণ্যসমূহ।"
       badgeText="Hot Right Now"
+      badgeTextBn="এখন জনপ্রিয়"
       badgeColorClass="bg-purple-500/20 text-purple-300 ring-1 ring-purple-500/30"
       products={toListingProducts(trendingProducts)}
       categories={categories || []}

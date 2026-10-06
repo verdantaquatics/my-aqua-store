@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { Printer, ArrowLeft, Palette, FileText } from 'lucide-react'
 import { PublicStoreSettings } from '@/utils/settings'
+import { formatOrderNumber } from '@/utils/order-number'
 
 interface InvoiceClientProps {
   order: any
@@ -179,7 +180,7 @@ export default function InvoiceClient({ order, settings }: InvoiceClientProps) {
 
           <div className="sm:text-right space-y-1">
             <h2 className="text-xl font-black text-slate-900 print:text-black">INVOICE</h2>
-            <p className="text-xs text-slate-500 print:text-black">Invoice ID: <span className="font-mono font-bold text-slate-800 print:text-black">{order.id.slice(0, 8).toUpperCase()}-{order.id.slice(9, 13).toUpperCase()}</span></p>
+            <p className="text-xs text-slate-500 print:text-black">Order / Invoice No: <span className="font-mono font-bold text-slate-800 print:text-black">#{formatOrderNumber(order.id)}</span></p>
             <p className="text-xs text-slate-500 print:text-black">Date: <span className="font-semibold text-slate-800 print:text-black">{date}</span></p>
             
             <div className="flex flex-wrap sm:justify-end gap-1.5 mt-2">
@@ -387,7 +388,7 @@ export default function InvoiceClient({ order, settings }: InvoiceClientProps) {
             </div>
           )}
 
-          <p className="text-[10px] text-slate-400 print:text-black font-semibold">For parcel queries or tracking, quote your Invoice ID: #{order.id.slice(0, 8).toUpperCase()}</p>
+          <p className="text-[10px] text-slate-400 print:text-black font-semibold">For parcel queries or tracking, quote your Order No: #{formatOrderNumber(order.id)}</p>
         </div>
 
       </div>

@@ -216,7 +216,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                   <div className="p-6 sm:p-8 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400">Order ID:</span>
+                        <span className="text-xs font-bold text-slate-400">{isBangla ? 'অর্ডার আইডি:' : 'Order ID:'}</span>
                         <span className="font-mono font-black text-slate-950 text-base">#{shortId}</span>
                         <span className="text-slate-300">•</span>
                         <span className="text-xs text-slate-500 font-medium">{orderDate}</span>
@@ -387,7 +387,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                   {/* Items List */}
                   {order.order_items && order.order_items.length > 0 && (
                     <div className="p-6 sm:p-8 space-y-3 bg-slate-50/30">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ordered Items</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{isBangla ? 'অর্ডারকৃত পণ্য' : 'Ordered Items'}</p>
                       <div className="space-y-2">
                         {order.order_items.map((item) => (
                           <div

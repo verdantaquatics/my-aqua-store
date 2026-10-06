@@ -157,9 +157,9 @@ export default function ProductDetailClient({ product, categories, relatedProduc
       {/* BREADCRUMB */}
       <nav className="bg-slate-100/80 py-3 border-b border-slate-200/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Link href="/" className="hover:text-brand-600">Home</Link>
+          <Link href="/" className="hover:text-brand-600">{t('nav.home')}</Link>
           <ChevronRight className="h-3 w-3" />
-          <Link href="/#categories" className="hover:text-brand-600">Shop</Link>
+          <Link href="/products" className="hover:text-brand-600">{isBangla ? 'শপ' : 'Shop'}</Link>
           <ChevronRight className="h-3 w-3" />
           <span className="text-slate-800 line-clamp-1">{product.name}</span>
         </div>

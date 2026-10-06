@@ -31,8 +31,11 @@ export default async function AllProductsPage() {
   return (
     <CollectionPageClient
       title="All Products"
+      titleBn="সকল পণ্য"
       subtitle="Browse our complete range of aquariums, plants, livestock and accessories."
+      subtitleBn="অ্যাকোয়ারিয়াম, প্ল্যান্ট, লাইভস্টক ও এক্সেসরিজের সম্পূর্ণ সংগ্রহ দেখুন।"
       badgeText="Full Catalog"
+      badgeTextBn="সম্পূর্ণ ক্যাটালগ"
       badgeColorClass="bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/30"
       products={toListingProducts(products)}
       categories={categories || []}

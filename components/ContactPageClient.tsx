@@ -162,13 +162,13 @@ export default function ContactPageClient() {
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
             <Link href="/" className="hover:text-brand-400">{t('nav.home')}</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-brand-400">{t('contact.contact_us')}</span>
+            <span className="text-brand-400">{t('contact.title')}</span>
           </div>
           <h1 className="text-3xl font-black tracking-tight sm:text-5xl text-white">
-            {t('contact.contact_us')}
+            {t('contact.title')}
           </h1>
           <p className="mt-3 text-sm text-slate-300 max-w-xl">
-            {t('contact.contact_subtitle')}
+            {t('contact.subtitle')}
           </p>
         </div>
       </section>
@@ -192,7 +192,7 @@ export default function ContactPageClient() {
             {submitted ? (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-center space-y-3 animate-fade-in">
                 <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto" />
-                <h3 className="text-sm font-bold text-emerald-950">{t('contact.message_sent_success')}</h3>
+                <h3 className="text-sm font-bold text-emerald-950">{t('contact.message_sent')}</h3>
                 <p className="text-xs text-emerald-700 leading-relaxed max-w-md mx-auto">
                   {isBangla ? 'আপনার বার্তাটি গ্রহণ করা হয়েছে। আমরা দ্রুত আপনার সাথে যোগাযোগ করব।' : 'Thank you for reaching out! We have received your message and will get back to you via phone or email shortly.'}
                 </p>
@@ -215,7 +215,7 @@ export default function ContactPageClient() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.your_name')} *</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.name')} *</label>
                     <input
                       type="text"
                       required
@@ -226,7 +226,7 @@ export default function ContactPageClient() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.phone_number')} *</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.phone')} *</label>
                     <input
                       type="tel"
                       required
@@ -240,7 +240,7 @@ export default function ContactPageClient() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.email_address')}</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.email')}</label>
                     <input
                       type="email"
                       placeholder="you@example.com"
@@ -262,7 +262,7 @@ export default function ContactPageClient() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.your_message')} *</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.message')} *</label>
                   <textarea
                     rows={4}
                     required
@@ -286,7 +286,7 @@ export default function ContactPageClient() {
                   ) : (
                     <>
                       <Send className="h-4 w-4" />
-                      <span>{t('contact.send_button')}</span>
+                      <span>{t('contact.send_btn')}</span>
                     </>
                   )}
                 </button>

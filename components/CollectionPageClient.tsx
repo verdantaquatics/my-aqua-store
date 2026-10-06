@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import ProductCard from '@/components/ProductCard'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface Product {
   id: string
@@ -36,19 +37,30 @@ interface CollectionPageClientProps {
   title: string
   subtitle: string
   badgeText: string
+  // Bangla versions (shown when the visitor switches to বাংলা)
+  titleBn?: string
+  subtitleBn?: string
+  badgeTextBn?: string
   badgeColorClass: string
   products: Product[]
   categories: Category[]
 }
 
 export default function CollectionPageClient({
-  title,
-  subtitle,
-  badgeText,
+  title: titleEn,
+  subtitle: subtitleEn,
+  badgeText: badgeTextEn,
+  titleBn,
+  subtitleBn,
+  badgeTextBn,
   badgeColorClass,
   products,
   categories
 }: CollectionPageClientProps) {
+  const { isBangla } = useLanguage()
+  const title = isBangla && titleBn ? titleBn : titleEn
+  const subtitle = isBangla && subtitleBn ? subtitleBn : subtitleEn
+  const badgeText = isBangla && badgeTextBn ? badgeTextBn : badgeTextEn
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [cartDrawerOpen, setCartDrawerOpen] = useState<boolean>(false)
 
@@ -72,7 +84,7 @@ export default function CollectionPageClient({
             className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back to Home</span>
+            <span>{isBangla ? 'হোমে ফিরে যান' : 'Back to Home'}</span>
           </Link>
 
           <div>
@@ -98,7 +110,7 @@ export default function CollectionPageClient({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search within collection..."
+              placeholder={isBangla ? 'এই কালেকশনে খুঁজুন...' : 'Search within collection...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition"
@@ -110,8 +122,8 @@ export default function CollectionPageClient({
         {filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200 my-8">
             <Filter className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-base font-bold text-slate-900">No products found</p>
-            <p className="mt-1 text-xs text-slate-500">There are currently no items matching this collection filter.</p>
+            <p className="text-base font-bold text-slate-900">{isBangla ? 'কোনো পণ্য পাওয়া যায়নি' : 'No products found'}</p>
+            <p className="mt-1 text-xs text-slate-500">{isBangla ? 'এই কালেকশনে বর্তমানে কোনো পণ্য নেই।' : 'There are currently no items matching this collection filter.'}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 pt-6 sm:pt-8">

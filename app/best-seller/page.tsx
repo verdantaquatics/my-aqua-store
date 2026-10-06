@@ -49,8 +49,11 @@ export default async function BestSellerCollectionPage() {
   return (
     <CollectionPageClient
       title="All-Time Best Sellers"
+      titleBn="সর্বোচ্চ বিক্রিত পণ্য"
       subtitle="Our most loved, highest-rated, and frequently ordered aquascaping essentials."
+      subtitleBn="ক্রেতাদের সবচেয়ে প্রিয় ও সবচেয়ে বেশি অর্ডার করা অ্যাকোয়াস্কেপিং পণ্যসমূহ।"
       badgeText="Customer Favorites"
+      badgeTextBn="ক্রেতাদের পছন্দ"
       badgeColorClass="bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/30"
       products={toListingProducts(bestSellerProducts)}
       categories={categories || []}
