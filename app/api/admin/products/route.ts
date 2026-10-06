@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
+import { revalidateStorefront } from '@/utils/revalidate'
 import { sanitizeRichText } from '@/utils/sanitize'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true, data })
 
   } catch (error: any) {
@@ -60,6 +62,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true })
 
   } catch (error: any) {
@@ -95,6 +98,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true, data })
 
   } catch (error: any) {
@@ -131,6 +135,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

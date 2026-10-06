@@ -1,10 +1,11 @@
 import { createAdminClient } from '@/utils/supabase/server'
-import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
+import { PUBLIC_PRODUCT_COLUMNS, toListingProducts } from '@/utils/product-columns'
 import { getPublicSettings } from '@/utils/settings'
 import { notFound } from 'next/navigation'
 import CollectionPageClient from '@/components/CollectionPageClient'
 
-export const revalidate = 0
+// Cached and served from the CDN; refreshed every 5 minutes and on changes
+export const revalidate = 300
 
 export default async function BestSellerCollectionPage() {
   const settings = await getPublicSettings()
@@ -13,37 +14,30 @@ export default async function BestSellerCollectionPage() {
   }
 
   const supabase = createAdminClient()
+  const autoBestSeller = settings.auto_best_seller !== false
 
-  // Fetch Categories
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name')
-
-  // Fetch Products
-  const { data: allProducts } = await supabase
-    .from('products')
-    .select(PUBLIC_PRODUCT_COLUMNS)
-    .eq('is_hidden', false)
+  const [{ data: categories }, { data: allProducts }, { data: allTimeItems }] = await Promise.all([
+    supabase.from('categories').select('*').order('name'),
+    supabase.from('products').select(PUBLIC_PRODUCT_COLUMNS).eq('is_hidden', false),
+    // All-time sales calculation from non-cancelled orders
+    autoBestSeller
+      ? supabase
+          .from('order_items')
+          .select('product_id, quantity, orders!inner(created_at, order_status)')
+          .neq('orders.order_status', 'Cancelled')
+      : Promise.resolve({ data: [] as any[] })
+  ])
 
   let bestSellerProducts = allProducts || []
 
-  if (settings.auto_best_seller !== false) {
-    // All-time sales calculation from non-cancelled orders
-    const { data: allTimeItems } = await supabase
-      .from('order_items')
-      .select('product_id, quantity, orders!inner(created_at, order_status)')
-      .neq('orders.order_status', 'Cancelled')
-
+  if (autoBestSeller) {
     const salesMap: Record<string, number> = {}
-    if (allTimeItems) {
-      allTimeItems.forEach((item: any) => {
-        const pid = item.product_id
-        if (pid) {
-          salesMap[pid] = (salesMap[pid] || 0) + Number(item.quantity || 1)
-        }
-      })
-    }
+    ;(allTimeItems || []).forEach((item: any) => {
+      const pid = item.product_id
+      if (pid) {
+        salesMap[pid] = (salesMap[pid] || 0) + Number(item.quantity || 1)
+      }
+    })
 
     bestSellerProducts = [...bestSellerProducts]
       .filter((p) => (salesMap[p.id] || 0) > 0 || Boolean(p.is_best_seller))
@@ -58,7 +52,7 @@ export default async function BestSellerCollectionPage() {
       subtitle="Our most loved, highest-rated, and frequently ordered aquascaping essentials."
       badgeText="Customer Favorites"
       badgeColorClass="bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/30"
-      products={bestSellerProducts}
+      products={toListingProducts(bestSellerProducts)}
       categories={categories || []}
     />
   )

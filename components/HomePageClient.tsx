@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Search, Filter, X } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -43,6 +43,21 @@ interface HomePageClientProps {
   allTimeSales?: Record<string, number>
   last30DaysSales?: Record<string, number>
   initialSearch?: string
+}
+
+// Applies ?search= (used by the navbar's mobile search) without making the
+// whole home page dynamic, so the page itself can stay cached on the CDN
+function SearchParamSync({ onSearch }: { onSearch: (query: string) => void }) {
+  const searchParams = useSearchParams()
+  const search = searchParams.get('search') || ''
+
+  useEffect(() => {
+    if (!search) return
+    onSearch(search)
+    setTimeout(() => document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }, [search])
+
+  return null
 }
 
 export default function HomePageClient({ products, categories, allTimeSales = {}, last30DaysSales = {}, initialSearch = '' }: HomePageClientProps) {
@@ -140,6 +155,9 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
 
   return (
     <div className="flex flex-col min-h-screen">
+      <Suspense fallback={null}>
+        <SearchParamSync onSearch={setSearchQuery} />
+      </Suspense>
       <Navbar onCartToggle={() => setCartDrawerOpen(true)} />
       
       {/* DYNAMIC HERO SECTION */}

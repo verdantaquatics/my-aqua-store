@@ -92,6 +92,13 @@ Setup checklist:
 
 Both require the `CRON_SECRET` bearer header. Vercel Cron sends it automatically when `CRON_SECRET` is set.
 
+## Performance & caching
+
+- Storefront pages (home, collections, categories, products, about, contact, track) are cached on the CDN and refreshed every 5 minutes. Category and product pages are generated on their first visit.
+- Any API route that changes what customers see must call `revalidateStorefront()` (`utils/revalidate.ts`) after a successful change, so the next visit gets fresh pages. Product, category, promotion, settings and order/stock routes already do.
+- Middleware runs only for `/stradmn` (the dashboard gate). Storefront pages never read the session on the server; customer state is loaded in the browser.
+- **Vercel function region:** set *Project > Settings > Functions > Function Region* to the region closest to your Supabase project (Supabase > Project Settings > General > Region). For example, Mumbai is `bom1` and Singapore is `sin1`. Every database query from the server crosses that distance.
+
 ## Deployment
 
 Deploy to Vercel (or any Node host): set the environment variables, then run `npm run build`. Uploads are compressed in the browser before upload so they stay under hosting request-size limits.

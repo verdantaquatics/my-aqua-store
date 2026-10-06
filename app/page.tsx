@@ -1,34 +1,29 @@
 import { createAdminClient } from '@/utils/supabase/server'
-import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
+import { PUBLIC_PRODUCT_COLUMNS, toListingProducts } from '@/utils/product-columns'
 import HomePageClient from '@/components/HomePageClient'
 
-export const revalidate = 0 // Disable cache to get live inventory status
+// Cached and served from the CDN; refreshed every 5 minutes and immediately
+// whenever products, settings or stock change (see utils/revalidate.ts)
+export const revalidate = 300
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
-  const { search = '' } = await searchParams
+export default async function HomePage() {
   const supabase = createAdminClient()
-
-  // Fetch Categories
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name')
-
-  // Fetch Products
-  const { data: products } = await supabase
-    .from('products')
-    .select(PUBLIC_PRODUCT_COLUMNS)
-    .order('created_at', { ascending: false })
-
-  // Fetch non-cancelled order items for Best Seller & Trending calculations
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: allTimeItems } = await supabase
-    .from('order_items')
-    .select('product_id, quantity, orders!inner(created_at, order_status)')
-    .neq('orders.order_status', 'Cancelled')
+  const [{ data: categories }, { data: products }, { data: allTimeItems }] = await Promise.all([
+    supabase.from('categories').select('*').order('name'),
+    supabase
+      .from('products')
+      .select(PUBLIC_PRODUCT_COLUMNS)
+      .eq('is_hidden', false)
+      .order('created_at', { ascending: false }),
+    // Non-cancelled order items for Best Seller & Trending calculations
+    supabase
+      .from('order_items')
+      .select('product_id, quantity, orders!inner(created_at, order_status)')
+      .neq('orders.order_status', 'Cancelled')
+  ])
 
-  // Aggregate all-time quantities
   const allTimeSales: Record<string, number> = {}
   const last30DaysSales: Record<string, number> = {}
 
@@ -47,13 +42,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <HomePageClient
-      key={search}
-      initialSearch={search}
-      products={products || []} 
+      products={toListingProducts(products)}
       categories={categories || []}
       allTimeSales={allTimeSales}
       last30DaysSales={last30DaysSales}
     />
   )
 }
-

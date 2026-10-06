@@ -3,7 +3,8 @@ import { getPublicSettings } from '@/utils/settings'
 import TrackOrderClient from '@/components/TrackOrderClient'
 import { Loader2 } from 'lucide-react'
 
-export const revalidate = 0
+// Cached and served from the CDN; refreshed every 5 minutes and on settings changes
+export const revalidate = 300
 
 export const metadata = {
   title: 'Track Order - Live Consignment Status',

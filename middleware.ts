@@ -6,14 +6,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  // Only the dashboard (and its legacy URLs) needs the session check + staff gate.
+  // Storefront pages don't read the session on the server (customer state is
+  // handled in the browser and API routes verify auth themselves), so skipping
+  // them avoids a Supabase Auth round trip on every page view and keeps them cacheable.
+  matcher: ['/stradmn/:path*', '/admin/:path*', '/login'],
 }

@@ -4,6 +4,7 @@ import { getStoreSettings, StoreSettings } from '@/utils/settings'
 import { bookPathaoConsignment, bookSteadfastConsignment } from '@/utils/courier'
 import { sendInvoiceEmail } from '@/utils/email'
 import { deductOrderInventory } from '@/utils/inventory'
+import { revalidateStorefront } from '@/utils/revalidate'
 import { orValue, ilikeExact, phoneVariants } from '@/utils/postgrest'
 import {
   priceCart,
@@ -333,6 +334,7 @@ export async function POST(request: NextRequest) {
     // Step D: Orders confirmed without the merchant gateway (bKash Personal / plain COD)
     if (!needsGateway) {
       await deductOrderInventory(supabase, order.id)
+      revalidateStorefront()
 
       if (customer_email) {
         const paymentLabel = isBkashPersonal
@@ -505,6 +507,7 @@ export async function GET(request: NextRequest) {
 
       // Decrement stock now that payment is confirmed
       await deductOrderInventory(supabase, order.id)
+      revalidateStorefront()
 
       // Send invoice email asynchronously if customer provided email
       if (order.customer_email) {

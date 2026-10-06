@@ -12,6 +12,7 @@ import PromoBanner from '@/components/PromoBanner'
 import AuthModal from '@/components/AuthModal'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
 import ImageProtection from '@/components/ImageProtection'
+import NextTopLoader from 'nextjs-toploader'
 import { getPublicSettings } from '@/utils/settings'
 import { createAdminClient } from '@/utils/supabase/server'
 
@@ -81,6 +82,8 @@ export default async function RootLayout({
         <link rel="icon" href={settings.favicon_url || settings.logo_url || '/logo.jpeg'} />
       </head>
       <body suppressHydrationWarning className={`${inter.className} bg-slate-50 text-slate-900 antialiased min-h-screen flex flex-col`}>
+        {/* Thin progress bar shown as soon as a link is clicked */}
+        <NextTopLoader color="rgb(var(--color-primary-500, 16 185 129))" height={3} showSpinner={false} shadow={false} />
         <TrackingScripts settings={settings} />
         <LanguageProvider>
           <ThemeProvider themeColor={settings.theme_color}>

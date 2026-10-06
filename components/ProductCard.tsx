@@ -213,6 +213,8 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
         <img
           src={product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5'}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-contain object-center p-2 group-hover:scale-105 transition-transform duration-500"
         />
         

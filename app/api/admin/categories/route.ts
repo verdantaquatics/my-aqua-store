@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
+import { revalidateStorefront } from '@/utils/revalidate'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+    revalidateStorefront()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('Failed to create category:', error)
@@ -100,6 +102,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) throw error
+    revalidateStorefront()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('Failed to update category:', error)
@@ -134,6 +137,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     if (error) throw error
+    revalidateStorefront()
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Failed to delete category:', error)

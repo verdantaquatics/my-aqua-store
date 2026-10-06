@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
+import { revalidateStorefront } from '@/utils/revalidate'
 import { restoreOrderInventory, deductOrderInventory, restoreProductStock, deductProductStock } from '@/utils/inventory'
 import { sendOrderDispatchedEmail, sendOrderCancelledEmail } from '@/utils/email'
 
@@ -238,6 +239,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true, data: updatedOrder })
 
   } catch (error: any) {
@@ -295,6 +297,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: orderError.message }, { status: 500 })
     }
 
+    revalidateStorefront()
     return NextResponse.json({ success: true, message: 'Order deleted successfully' })
   } catch (error: any) {
     console.error('Order Delete Error:', error.message)

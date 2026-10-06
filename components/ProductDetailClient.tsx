@@ -226,7 +226,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                         </div>
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={mediaUrl} alt="" className="h-full w-full object-cover object-center" />
+                        <img src={mediaUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" />
                       )}
                     </button>
                   )

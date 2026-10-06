@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
 import { restoreOrderInventory } from '@/utils/inventory'
+import { revalidateStorefront } from '@/utils/revalidate'
 import { phoneVariants } from '@/utils/postgrest'
 
 const TRACK_COLUMNS = 'id, created_at, customer_name, customer_phone, shipping_address, order_status, payment_status, payment_method, payment_details, total_price, delivery_charge, discount_amount, shipping_provider, pathao_status, pathao_consignment_id, steadfast_consignment_id, steadfast_tracking_code, order_items(id, quantity, price, selected_variations, products(name, images))'
@@ -132,6 +133,7 @@ export async function GET(request: NextRequest) {
             } else if (s.includes('return') || s.includes('cancelled') || s.includes('canceled')) {
               if (order.order_status !== 'Cancelled') {
                 await restoreOrderInventory(adminDb, order.id)
+            revalidateStorefront()
               }
               order.order_status = 'Cancelled'
               order.pathao_status = 'returned'

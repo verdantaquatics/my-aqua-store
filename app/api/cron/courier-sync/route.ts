@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
 import { restoreOrderInventory } from '@/utils/inventory'
+import { revalidateStorefront } from '@/utils/revalidate'
 import { verifyStaffAuth } from '@/utils/auth'
 import { isAuthorizedCronRequest } from '@/utils/cron'
 
@@ -153,6 +154,7 @@ async function performCourierSync(): Promise<{
         if (currentOrderStatus !== 'Cancelled' && mapping.order_status === 'Cancelled') {
           try {
             await restoreOrderInventory(supabase, order.id)
+            revalidateStorefront()
           } catch (invErr) {
             console.error(`Failed to restore inventory for order ${order.id}:`, invErr)
           }

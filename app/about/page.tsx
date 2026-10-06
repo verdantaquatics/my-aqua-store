@@ -2,7 +2,8 @@ import { getPublicSettings } from '@/utils/settings'
 import AboutPageClient from '@/components/AboutPageClient'
 import type { Metadata } from 'next'
 
-export const revalidate = 0
+// Cached and served from the CDN; refreshed every 5 minutes and on settings changes
+export const revalidate = 300
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings()

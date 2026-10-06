@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
 import { restoreOrderInventory } from '@/utils/inventory'
+import { revalidateStorefront } from '@/utils/revalidate'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
           // If status moved to Cancelled/Returned -> restore stock
           if (oldStatus !== 'Cancelled' && mapping.order_status === 'Cancelled') {
             await restoreOrderInventory(adminDb, order.id)
+            revalidateStorefront()
           }
 
           const updatePayload: Record<string, any> = {}

@@ -1,10 +1,11 @@
 import { createAdminClient } from '@/utils/supabase/server'
-import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
+import { PUBLIC_PRODUCT_COLUMNS, toListingProducts } from '@/utils/product-columns'
 import { getPublicSettings } from '@/utils/settings'
 import { notFound } from 'next/navigation'
 import CollectionPageClient from '@/components/CollectionPageClient'
 
-export const revalidate = 0
+// Cached and served from the CDN; refreshed every 5 minutes and on changes
+export const revalidate = 300
 
 export default async function FeaturedCollectionPage() {
   const settings = await getPublicSettings()
@@ -14,19 +15,15 @@ export default async function FeaturedCollectionPage() {
 
   const supabase = createAdminClient()
 
-  // Fetch Categories
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name')
-
-  // Fetch Featured Products
-  const { data: products } = await supabase
-    .from('products')
-    .select(PUBLIC_PRODUCT_COLUMNS)
-    .eq('is_featured', true)
-    .eq('is_hidden', false)
-    .order('created_at', { ascending: false })
+  const [{ data: categories }, { data: products }] = await Promise.all([
+    supabase.from('categories').select('*').order('name'),
+    supabase
+      .from('products')
+      .select(PUBLIC_PRODUCT_COLUMNS)
+      .eq('is_featured', true)
+      .eq('is_hidden', false)
+      .order('created_at', { ascending: false })
+  ])
 
   return (
     <CollectionPageClient
@@ -34,7 +31,7 @@ export default async function FeaturedCollectionPage() {
       subtitle="Carefully curated and hand-picked showcase items recommended by our store."
       badgeText="Curated Showcase"
       badgeColorClass="bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
-      products={products || []}
+      products={toListingProducts(products)}
       categories={categories || []}
     />
   )

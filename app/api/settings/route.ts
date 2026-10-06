@@ -10,6 +10,7 @@ import {
 } from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
 import { verifyStaffAuth } from '@/utils/auth'
+import { revalidateStorefront } from '@/utils/revalidate'
 
 export const dynamic = 'force-dynamic'
 
@@ -185,6 +186,7 @@ export async function PUT(request: NextRequest) {
 
     // Clear server in-memory cache
     invalidateSettingsCache()
+    revalidateStorefront()
 
     // Return the normalised settings (not the raw row) so the dashboard shows exactly what was stored
     const fresh = await getStoreSettings(true)
