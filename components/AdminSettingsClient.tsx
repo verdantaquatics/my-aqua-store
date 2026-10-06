@@ -12,6 +12,7 @@ import { THEME_PALETTES } from '@/utils/theme'
 import { formatGoogleMapsEmbedUrl } from '@/utils/map'
 import { describeDeliveryCharges } from '@/utils/delivery'
 import ImageUploader from '@/components/ImageUploader'
+import HeroLinkPicker from '@/components/HeroLinkPicker'
 import AdminSidebar from '@/components/AdminSidebar'
 import {
   BarChart3, ShoppingBag, Package, LogOut, Settings, Save,
@@ -29,7 +30,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
   const router = useRouter()
   const supabase = createClient()
   const { t, isBangla } = useLanguage()
-  const { updateClientSettings } = useStore()
+  const { updateClientSettings, categories: storeCategories } = useStore()
 
   const [settings, setSettings] = useState<StoreSettings>(initialSettings)
   const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'emails' | 'tracking' | 'about'>('branding')
@@ -476,6 +477,18 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      "Shop Now" Button Link
+                    </label>
+                    <p className="text-[11px] text-slate-500 mb-2">Where the hero banner button takes customers.</p>
+                    <HeroLinkPicker
+                      value={settings.hero_button_link ?? '/products'}
+                      onChange={(link) => setSettings({ ...settings, hero_button_link: link })}
+                      categories={storeCategories}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                       Hero Banner Background Image
                     </label>
                     <p className="text-[11px] text-slate-500 mb-2">High-resolution banner background image (auto-compressed on upload).</p>
@@ -595,9 +608,9 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     {/* HOME PAGE: ALL PRODUCTS GRID */}
                     <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-4">
                       <div>
-                        <span className="text-xs font-bold text-slate-800 block">Show "All Products" grid on home page</span>
+                        <span className="text-xs font-bold text-slate-800 block">Show the full catalog on the home page</span>
                         <span className="text-[11px] text-slate-500 block mt-0.5">
-                          When off, the home page only shows the collections above. Search results are still shown when a customer searches.
+                          Off (recommended): the home page shows two rows of products with a "View all products" button. On: every product is listed on the home page.
                         </span>
                       </div>
                       <button

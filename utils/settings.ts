@@ -14,6 +14,8 @@ export interface StoreSettings {
   hero_title: string
   hero_subtitle: string
   hero_description: string
+  // Where the hero "Shop Now" button links to (site path, #anchor or http(s) URL)
+  hero_button_link: string
   // Theme
   theme_color: string
   // Payment Options & Methods
@@ -128,6 +130,8 @@ export interface PublicStoreSettings {
   hero_title: string
   hero_subtitle: string
   hero_description: string
+  // Where the hero "Shop Now" button links to (site path, #anchor or http(s) URL)
+  hero_button_link: string
   theme_color: string
   cod_enabled: boolean
   cod_prepay_delivery: boolean
@@ -263,6 +267,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   custom_head_scripts: '',
   invoice_print_colorful: false,
   hero_overlay_opacity: 35,
+  hero_button_link: '/products',
   showcase_overlay_opacity: 60,
   show_all_products: false,
   protect_images: true,
@@ -357,6 +362,7 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       custom_head_scripts: data.custom_head_scripts ?? '',
       invoice_print_colorful: data.invoice_print_colorful !== undefined ? Boolean(data.invoice_print_colorful) : DEFAULT_SETTINGS.invoice_print_colorful,
       hero_overlay_opacity: data.hero_overlay_opacity != null ? Number(data.hero_overlay_opacity) : DEFAULT_SETTINGS.hero_overlay_opacity,
+      hero_button_link: data.hero_button_link || DEFAULT_SETTINGS.hero_button_link,
       showcase_overlay_opacity: data.showcase_overlay_opacity != null ? Number(data.showcase_overlay_opacity) : DEFAULT_SETTINGS.showcase_overlay_opacity,
       show_all_products: data.show_all_products != null ? Boolean(data.show_all_products) : DEFAULT_SETTINGS.show_all_products,
       protect_images: data.protect_images != null ? Boolean(data.protect_images) : DEFAULT_SETTINGS.protect_images,
@@ -395,6 +401,7 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     hero_title: full.hero_title,
     hero_subtitle: full.hero_subtitle,
     hero_description: full.hero_description,
+    hero_button_link: full.hero_button_link,
     theme_color: full.theme_color || 'emerald',
     cod_enabled: full.cod_enabled,
     cod_prepay_delivery: full.cod_prepay_delivery,

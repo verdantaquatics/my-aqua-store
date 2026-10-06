@@ -8,7 +8,7 @@ import {
   isMaskedSecret,
   maskSecretSettings
 } from '@/utils/settings'
-import { formatExternalUrl } from '@/utils/url'
+import { formatExternalUrl, safeSiteLink } from '@/utils/url'
 import { verifyStaffAuth } from '@/utils/auth'
 import { revalidateStorefront } from '@/utils/revalidate'
 
@@ -64,6 +64,9 @@ export async function PUT(request: NextRequest) {
       hero_title: body.hero_title !== undefined ? body.hero_title : current.hero_title,
       hero_subtitle: body.hero_subtitle !== undefined ? body.hero_subtitle : current.hero_subtitle,
       hero_description: body.hero_description !== undefined ? body.hero_description : current.hero_description,
+      hero_button_link: body.hero_button_link !== undefined
+        ? (safeSiteLink(body.hero_button_link) || '/products')
+        : current.hero_button_link,
       theme_color: body.theme_color || current.theme_color || 'emerald',
       cod_enabled: body.cod_enabled !== undefined ? Boolean(body.cod_enabled) : current.cod_enabled,
       cod_prepay_delivery: body.cod_prepay_delivery !== undefined ? Boolean(body.cod_prepay_delivery) : current.cod_prepay_delivery,

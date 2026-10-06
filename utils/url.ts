@@ -11,3 +11,21 @@ export function formatExternalUrl(url?: string): string {
   }
   return `https://${trimmed}`
 }
+
+/**
+ * Validates a link an admin configures for a storefront button.
+ * Allows site paths ("/products", "/category/plants"), on-page anchors ("#catalog")
+ * and full http(s) URLs. Anything else (e.g. "javascript:") returns ''.
+ */
+export function safeSiteLink(link?: string | null): string {
+  const value = String(link || '').trim()
+  if (!value) return ''
+  if (value.startsWith('/') && !value.startsWith('//')) return value
+  if (value.startsWith('#')) return value
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : ''
+  } catch {
+    return ''
+  }
+}

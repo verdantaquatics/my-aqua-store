@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     hero_title VARCHAR(255) DEFAULT 'Discover Our',
     hero_subtitle VARCHAR(255) DEFAULT 'Exclusive Collection',
     hero_description TEXT DEFAULT 'Browse our curated collection with fast door-to-door delivery across Bangladesh.',
+    hero_button_link TEXT DEFAULT '/products',
     -- Theme
     theme_color VARCHAR(50) DEFAULT 'emerald',
     -- Payment Options & bKash Credentials
@@ -250,6 +251,7 @@ ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_tag_manager_id
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_site_verification VARCHAR(255) DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS tiktok_events_api_token TEXT DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS custom_head_scripts TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS hero_button_link TEXT DEFAULT '/products';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS delivery_mode VARCHAR(10) DEFAULT 'zone';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS delivery_charge_flat NUMERIC(10, 2) DEFAULT 100.00;
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS invoice_print_colorful BOOLEAN DEFAULT FALSE;

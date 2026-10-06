@@ -12,6 +12,7 @@ import ShowcaseSection from '@/components/ShowcaseSection'
 import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { getDescendantIds } from '@/utils/categories'
+import { safeSiteLink } from '@/utils/url'
 
 interface Product {
   id: string
@@ -44,6 +45,9 @@ interface HomePageClientProps {
   last30DaysSales?: Record<string, number>
   initialSearch?: string
 }
+
+// Products shown on the home page before "View all" (two rows of 4 on desktop)
+const HOME_PREVIEW_COUNT = 8
 
 // Applies ?search= (used by the navbar's mobile search) without making the
 // whole home page dynamic, so the page itself can stay cached on the CDN
@@ -136,9 +140,15 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
   // Top level categories for the pill bar
   const parentCategories = categories.filter((c) => !c.parent_id)
 
-  // The full catalog grid is optional; it always shows while searching since it renders the results
-  const showCatalog = settings.show_all_products || searchQuery.trim().length > 0
-  const shopNowHref = showCatalog ? '#catalog' : settings.show_featured ? '/featured' : '#top-product-search'
+  // The products section is always on the home page (the collection sliders are optional,
+  // so without it the page could be empty). It previews two rows with a "View all" link,
+  // unless "show full catalog" is enabled in Settings. Searches always show every match.
+  const isSearching = searchQuery.trim().length > 0
+  const isPreview = !settings.show_all_products && !isSearching
+  const shownProducts = isPreview ? filteredProducts.slice(0, HOME_PREVIEW_COUNT) : filteredProducts
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
+  const viewAllHref = selectedCategory ? `/category/${selectedCategory.slug}` : '/products'
+  const shopNowHref = safeSiteLink(settings.hero_button_link) || '/products'
 
   // Scales the left-side gradient with the overlay setting (35% = original look, 0% = none)
   const heroOverlay = (settings.hero_overlay_opacity ?? 35) / 100
@@ -277,7 +287,6 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       )}
 
       {/* ALL PRODUCTS MAIN CATALOG SECTION */}
-      {showCatalog ? (
       <main id="catalog" className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
         
         {/* Catalog Header */}
@@ -287,11 +296,19 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
               {searchQuery ? (isBangla ? `"${searchQuery}" এর সার্চ ফলাফল` : `Search Results for "${searchQuery}"`) : t('nav.all_products')}
             </h2>
             <p className="mt-0.5 sm:mt-1 text-xs text-slate-500">
-              {isBangla 
-                ? `${toBengaliDigits(filteredProducts.length)} টি পণ্য প্রদর্শিত হচ্ছে` 
-                : `Showing ${filteredProducts.length} items`}
+              {isBangla
+                ? `${toBengaliDigits(filteredProducts.length)} টি পণ্য`
+                : `${filteredProducts.length} items`}
             </p>
           </div>
+          {isPreview && filteredProducts.length > HOME_PREVIEW_COUNT && (
+            <Link
+              href={viewAllHref}
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700"
+            >
+              {isBangla ? 'সব দেখুন' : 'View all'} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
 
         {/* Category Filter Pills */}
@@ -330,13 +347,24 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {filteredProducts.map(renderProductCard)}
+            {shownProducts.map(renderProductCard)}
+          </div>
+        )}
+
+        {isPreview && filteredProducts.length > HOME_PREVIEW_COUNT && (
+          <div className="flex justify-center pt-8">
+            <Link
+              href={viewAllHref}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-brand-500 transition"
+            >
+              {isBangla
+                ? `সব পণ্য দেখুন (${toBengaliDigits(filteredProducts.length)})`
+                : `View all products (${filteredProducts.length})`}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         )}
       </main>
-      ) : (
-        <div id="catalog" className="flex-1" />
-      )}
 
       {/* DYNAMIC FOOTER */}
       <Footer />
