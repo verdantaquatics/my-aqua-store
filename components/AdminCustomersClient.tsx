@@ -36,6 +36,13 @@ interface OrderItemSummary {
   status: string
   created_at: string
   user_id?: string
+  customer_id?: string
+}
+
+// Last 10 digits of a BD mobile number, so 017…, 88017… and +88017… all compare equal
+const normalizePhone = (phone = '') => {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length >= 10 ? digits.slice(-10) : digits
 }
 
 interface ContactMessage {
@@ -89,15 +96,16 @@ export default function AdminCustomersClient({
     const stats: Record<string, { orderCount: number; totalSpent: number; orders: OrderItemSummary[] }> = {}
 
     customers.forEach((c) => {
-      const cleanPhone = (c.phone || '').trim().replace(/[^0-9]/g, '')
+      const cleanPhone = normalizePhone(c.phone || '')
       const cleanEmail = (c.email || '').trim().toLowerCase()
       const userId = c.user_id || c.id
 
       const matchingOrders = orders.filter((o) => {
-        const orderPhone = (o.customer_phone || '').trim().replace(/[^0-9]/g, '')
+        const orderPhone = normalizePhone(o.customer_phone || '')
         const orderEmail = (o.customer_email || '').trim().toLowerCase()
         const orderUserId = o.user_id
 
+        if (o.customer_id && o.customer_id === c.id) return true
         if (orderUserId && orderUserId === userId) return true
         if (cleanEmail && orderEmail && cleanEmail === orderEmail) return true
         if (cleanPhone && orderPhone && cleanPhone === orderPhone) return true

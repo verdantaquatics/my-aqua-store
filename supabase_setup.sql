@@ -1,6 +1,13 @@
 -- ==============================================================================
 -- COMPLETE MASTER DATABASE SETUP FOR NEW STORE DEPLOYMENTS
 -- Single Clean Setup SQL (No Demo Products - Clean Slate Production Ready)
+--
+-- This is the ONE file a new site needs: every table, column, security policy
+-- and function. Safe to re-run on an existing database (everything is
+-- IF NOT EXISTS / CREATE OR REPLACE, and policies are dropped and recreated).
+--
+-- Keep it complete: when a migration adds a column or policy, add it here too.
+-- Optional demo products: supabase_schema.sql (run after this file).
 -- ==============================================================================
 
 -- 1. ENABLE EXTENSIONS
@@ -205,6 +212,23 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     daily_digest_enabled BOOLEAN DEFAULT FALSE,
     daily_digest_time VARCHAR(10) DEFAULT '20:00',
     daily_digest_email VARCHAR(255) DEFAULT '',
+    -- Delivery pricing mode ('zone' = inside/outside store city, 'flat' = one nationwide rate)
+    delivery_mode VARCHAR(10) DEFAULT 'zone',
+    delivery_charge_flat NUMERIC(10, 2) DEFAULT 100.00,
+    -- Storefront Look & Behaviour
+    invoice_print_colorful BOOLEAN DEFAULT FALSE,
+    hero_overlay_opacity INT DEFAULT 35,
+    showcase_overlay_opacity INT DEFAULT 60,
+    show_all_products BOOLEAN DEFAULT FALSE,
+    protect_images BOOLEAN DEFAULT TRUE,
+    watermark_image_url TEXT DEFAULT '',
+    -- About Page Value Pillars
+    about_quality_title TEXT DEFAULT '',
+    about_quality_desc TEXT DEFAULT '',
+    about_delivery_title TEXT DEFAULT '',
+    about_delivery_desc TEXT DEFAULT '',
+    about_support_title TEXT DEFAULT '',
+    about_support_desc TEXT DEFAULT '',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bkash_personal_enabled BOOLEAN DEFAULT FALSE;
@@ -226,6 +250,20 @@ ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_tag_manager_id
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS google_site_verification VARCHAR(255) DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS tiktok_events_api_token TEXT DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS custom_head_scripts TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS delivery_mode VARCHAR(10) DEFAULT 'zone';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS delivery_charge_flat NUMERIC(10, 2) DEFAULT 100.00;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS invoice_print_colorful BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS hero_overlay_opacity INT DEFAULT 35;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS showcase_overlay_opacity INT DEFAULT 60;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS show_all_products BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS protect_images BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS watermark_image_url TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_quality_title TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_quality_desc TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_delivery_title TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_delivery_desc TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_support_title TEXT DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS about_support_desc TEXT DEFAULT '';
 
 -- Seed Initial Default Store Settings Row
 INSERT INTO public.store_settings (
@@ -249,8 +287,8 @@ INSERT INTO public.store_settings (
     'Welcome to our store! We provide high-quality items curated with passion and attention to detail. Every product is backed by nationwide delivery and friendly support.',
     '+880 1700-000000',
     '',
-    'sakib.samadhan@gmail.com',
-    'Dhaka, Bangladesh'
+    '',
+    'Bangladesh'
 ) ON CONFLICT (id) DO NOTHING;
 
 -- 8. CREATE STAFF MEMBERS & ROLE-BASED ACCESS CONTROL (RBAC)
@@ -270,119 +308,29 @@ CREATE INDEX IF NOT EXISTS idx_staff_members_email ON public.staff_members(email
 CREATE INDEX IF NOT EXISTS idx_staff_members_user_id ON public.staff_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON public.staff_members(role);
 
--- 9. CREATE AUTH ADMIN USER & STAFF RECORD (sakib.samadhan@gmail.com / Sakib@9700)
+-- 9. STORE OWNER ACCESS
+-- 1) Create the owner's login in Supabase Dashboard > Authentication > Users > "Add user"
+--    (tick "Auto Confirm User" and choose a strong password - never commit it here).
+-- 2) Put that email below and run this file. The login is linked to the staff row
+--    automatically on first sign-in at /stradmn/login.
 DO $$
 DECLARE
-    new_user_id UUID := gen_random_uuid();
+    owner_email TEXT := 'owner@example.com'; -- CHANGE THIS to the store owner's email
 BEGIN
-    BEGIN
-        -- Check if user already exists in auth.users
-        IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'sakib.samadhan@gmail.com') THEN
-            INSERT INTO auth.users (
-                instance_id,
-                id,
-                aud,
-                role,
-                email,
-                encrypted_password,
-                email_confirmed_at,
-                recovery_sent_at,
-                last_sign_in_at,
-                raw_app_meta_data,
-                raw_user_meta_data,
-                created_at,
-                updated_at,
-                confirmation_token,
-                email_change,
-                email_change_token_new,
-                recovery_token
-            ) VALUES (
-                '00000000-0000-0000-0000-000000000000',
-                new_user_id,
-                'authenticated',
-                'authenticated',
-                'sakib.samadhan@gmail.com',
-                crypt('Sakib@9700', gen_salt('bf')),
-                NOW(),
-                NOW(),
-                NOW(),
-                '{"provider":"email","providers":["email"]}'::jsonb,
-                '{"full_name":"Sakib Samadhan","role":"shop_owner"}'::jsonb,
-                NOW(),
-                NOW(),
-                '',
-                '',
-                '',
-                ''
-            );
+    IF owner_email = 'owner@example.com' THEN
+        RAISE NOTICE 'Skipping owner seed: set owner_email in section 9 first.';
+        RETURN;
+    END IF;
 
-            -- Insert identity record (REQUIRED by Supabase GoTrue Auth)
-            INSERT INTO auth.identities (
-                id,
-                user_id,
-                identity_data,
-                provider,
-                provider_id,
-                last_sign_in_at,
-                created_at,
-                updated_at
-            ) VALUES (
-                new_user_id,
-                new_user_id,
-                format('{"sub":"%s","email":"%s"}', new_user_id, 'sakib.samadhan@gmail.com')::jsonb,
-                'email',
-                new_user_id::text,
-                NOW(),
-                NOW(),
-                NOW()
-            );
-        ELSE
-            -- Update password if user already exists
-            UPDATE auth.users
-            SET encrypted_password = crypt('Sakib@9700', gen_salt('bf')),
-                email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-                raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'::jsonb), '{role}', '"shop_owner"'),
-                updated_at = NOW()
-            WHERE email = 'sakib.samadhan@gmail.com';
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Auth user direct creation notice (can create via Supabase Auth UI if skipped): %', SQLERRM;
-    END;
-
-    -- Upsert in staff_members table
-    BEGIN
-        INSERT INTO public.staff_members (
-            user_id,
-            email,
-            full_name,
-            role,
-            status
-        )
-        SELECT
-            id,
-            'sakib.samadhan@gmail.com',
-            'Sakib Samadhan',
-            'shop_owner',
-            'active'
-        FROM auth.users
-        WHERE email = 'sakib.samadhan@gmail.com'
-        ON CONFLICT (email) DO UPDATE
-        SET role = 'shop_owner', status = 'active';
-    EXCEPTION WHEN OTHERS THEN
-        INSERT INTO public.staff_members (
-            email,
-            full_name,
-            role,
-            status
-        ) VALUES (
-            'sakib.samadhan@gmail.com',
-            'Sakib Samadhan',
-            'shop_owner',
-            'active'
-        )
-        ON CONFLICT (email) DO UPDATE
-        SET role = 'shop_owner', status = 'active';
-    END;
+    INSERT INTO public.staff_members (user_id, email, full_name, role, status)
+    VALUES (
+        (SELECT id FROM auth.users WHERE lower(email) = lower(owner_email) LIMIT 1),
+        lower(owner_email),
+        'Store Owner',
+        'shop_owner',
+        'active'
+    )
+    ON CONFLICT (email) DO UPDATE SET role = 'shop_owner', status = 'active';
 END $$;
 
 -- 10. CREATE CUSTOMERS, WISHLISTS, PROMOTIONS & PROMO_CODES TABLES
@@ -460,110 +408,92 @@ ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS excluded_category_ids UU
 CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON public.promo_codes(code);
 CREATE INDEX IF NOT EXISTS idx_promo_codes_is_active ON public.promo_codes(is_active);
 
--- 11. ENABLE ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+-- 11. ROW LEVEL SECURITY, POLICIES & STOCK FUNCTIONS
+-- The browser/anon key may only read the catalog (without buying_price) and a
+-- staff member's own staff_members row. Everything else goes through the server
+-- with the service role key, which bypasses RLS.
+
+-- 11.1 DROP EVERY EXISTING POLICY ON THE APP TABLES
+DO $$
+DECLARE
+    pol RECORD;
+BEGIN
+    FOR pol IN
+        SELECT policyname, tablename
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename IN (
+            'categories', 'products', 'orders', 'order_items', 'store_settings',
+            'staff_members', 'customers', 'wishlists', 'contact_messages',
+            'promotions', 'promo_codes'
+          )
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    END LOOP;
+END $$;
+
+-- 11.2 MAKE SURE RLS IS ON EVERYWHERE (no policy = no access for anon/authenticated)
+ALTER TABLE public.categories       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_settings   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff_members    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wishlists        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.promo_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promotions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promo_codes      ENABLE ROW LEVEL SECURITY;
 
--- Categories RLS
-DROP POLICY IF EXISTS "Allow public read categories" ON public.categories;
-DROP POLICY IF EXISTS "Allow admin write categories" ON public.categories;
-CREATE POLICY "Allow public read categories" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow admin write categories" ON public.categories FOR ALL TO authenticated USING (true);
+-- 11.3 PUBLIC READ-ONLY CATALOG
+CREATE POLICY "Public read categories" ON public.categories
+    FOR SELECT TO anon, authenticated USING (true);
 
--- Products RLS
-DROP POLICY IF EXISTS "Allow public read products" ON public.products;
-DROP POLICY IF EXISTS "Allow admin write products" ON public.products;
-CREATE POLICY "Allow public read products" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Allow admin write products" ON public.products FOR ALL TO authenticated USING (true);
+CREATE POLICY "Public read products" ON public.products
+    FOR SELECT TO anon, authenticated USING (true);
 
--- Orders RLS
-DROP POLICY IF EXISTS "Allow public insert orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow users and admin read orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow admin manage orders" ON public.orders;
-CREATE POLICY "Allow public insert orders" ON public.orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow users and admin read orders" ON public.orders FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage orders" ON public.orders FOR ALL TO authenticated USING (true);
+-- Wholesale cost must never be readable with the public key
+REVOKE SELECT ON public.products FROM anon, authenticated;
+GRANT SELECT (
+    id, category_id, name, slug, short_description, description, price, old_price,
+    stock, images, variations, is_featured, is_best_seller, is_trending, is_hidden, created_at
+) ON public.products TO anon, authenticated;
 
--- Order Items RLS
-DROP POLICY IF EXISTS "Allow public insert order items" ON public.order_items;
-DROP POLICY IF EXISTS "Allow public read order items" ON public.order_items;
-DROP POLICY IF EXISTS "Allow admin manage order items" ON public.order_items;
-CREATE POLICY "Allow public insert order items" ON public.order_items FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public read order items" ON public.order_items FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage order items" ON public.order_items FOR ALL TO authenticated USING (true);
+-- 11.4 STAFF CAN SEE ONLY THEIR OWN STAFF ROW (used to show the storefront admin pill)
+CREATE POLICY "Staff read own row" ON public.staff_members
+    FOR SELECT TO authenticated USING (user_id = auth.uid());
 
--- Contact Messages RLS
-DROP POLICY IF EXISTS "Allow public insert contact messages" ON public.contact_messages;
-DROP POLICY IF EXISTS "Allow admin manage contact messages" ON public.contact_messages;
-CREATE POLICY "Allow public insert contact messages" ON public.contact_messages FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow admin manage contact messages" ON public.contact_messages FOR ALL TO authenticated USING (true);
+-- No write privileges at all for client keys on sensitive tables
+REVOKE INSERT, UPDATE, DELETE ON public.staff_members, public.store_settings,
+    public.orders, public.order_items, public.customers, public.wishlists,
+    public.contact_messages, public.promotions, public.promo_codes,
+    public.categories, public.products
+FROM anon, authenticated;
+REVOKE SELECT ON public.staff_members, public.store_settings FROM anon;
 
--- Store Settings RLS
-DROP POLICY IF EXISTS "Allow public read settings" ON public.store_settings;
-DROP POLICY IF EXISTS "Allow admin manage settings" ON public.store_settings;
-CREATE POLICY "Allow public read settings" ON public.store_settings FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage settings" ON public.store_settings FOR ALL TO authenticated USING (true);
-
--- Staff Members RLS
-DROP POLICY IF EXISTS "Allow authenticated read staff" ON public.staff_members;
-DROP POLICY IF EXISTS "Allow admin manage staff" ON public.staff_members;
-CREATE POLICY "Allow authenticated read staff" ON public.staff_members FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage staff" ON public.staff_members FOR ALL TO authenticated USING (true);
-
--- Customers RLS
-DROP POLICY IF EXISTS "Allow public read customers" ON public.customers;
-DROP POLICY IF EXISTS "Allow public insert customers" ON public.customers;
-DROP POLICY IF EXISTS "Allow authenticated manage own customer" ON public.customers;
-DROP POLICY IF EXISTS "Allow admin manage all customers" ON public.customers;
-CREATE POLICY "Allow public read customers" ON public.customers FOR SELECT USING (true);
-CREATE POLICY "Allow public insert customers" ON public.customers FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow authenticated manage own customer" ON public.customers FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Allow admin manage all customers" ON public.customers FOR ALL TO authenticated USING (true);
-
--- Wishlists RLS
-DROP POLICY IF EXISTS "Allow public read wishlists" ON public.wishlists;
-DROP POLICY IF EXISTS "Allow public manage wishlists" ON public.wishlists;
-DROP POLICY IF EXISTS "Allow admin manage wishlists" ON public.wishlists;
-CREATE POLICY "Allow public read wishlists" ON public.wishlists FOR SELECT USING (true);
-CREATE POLICY "Allow public manage wishlists" ON public.wishlists FOR ALL USING (true);
-CREATE POLICY "Allow admin manage wishlists" ON public.wishlists FOR ALL TO authenticated USING (true);
-
--- Promotions RLS
-DROP POLICY IF EXISTS "Allow public read promotions" ON public.promotions;
-DROP POLICY IF EXISTS "Allow admin manage promotions" ON public.promotions;
-CREATE POLICY "Allow public read promotions" ON public.promotions FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage promotions" ON public.promotions FOR ALL TO authenticated USING (true);
-
--- Promo Codes RLS
-DROP POLICY IF EXISTS "Allow public read promo codes" ON public.promo_codes;
-DROP POLICY IF EXISTS "Allow admin manage promo codes" ON public.promo_codes;
-CREATE POLICY "Allow public read promo codes" ON public.promo_codes FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage promo codes" ON public.promo_codes FOR ALL TO authenticated USING (true);
-
--- 12. RPC FUNCTIONS TO SAFELY DECREMENT & INCREMENT PRODUCT STOCK
-CREATE OR REPLACE FUNCTION decrement_product_stock(prod_id UUID, qty INT)
+-- 11.5 STOCK FUNCTIONS: server only, and reject non-positive quantities
+CREATE OR REPLACE FUNCTION public.decrement_product_stock(prod_id UUID, qty INT)
 RETURNS VOID AS $$
 BEGIN
-    UPDATE public.products
-    SET stock = GREATEST(0, stock - qty)
-    WHERE id = prod_id;
+    IF qty IS NULL OR qty <= 0 THEN
+        RAISE EXCEPTION 'qty must be positive';
+    END IF;
+    UPDATE public.products SET stock = GREATEST(0, stock - qty) WHERE id = prod_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
-CREATE OR REPLACE FUNCTION increment_product_stock(prod_id UUID, qty INT)
+CREATE OR REPLACE FUNCTION public.increment_product_stock(prod_id UUID, qty INT)
 RETURNS VOID AS $$
 BEGIN
-    UPDATE public.products
-    SET stock = stock + qty
-    WHERE id = prod_id;
+    IF qty IS NULL OR qty <= 0 THEN
+        RAISE EXCEPTION 'qty must be positive';
+    END IF;
+    UPDATE public.products SET stock = stock + qty WHERE id = prod_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE EXECUTE ON FUNCTION public.decrement_product_stock(UUID, INT) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.increment_product_stock(UUID, INT) FROM PUBLIC, anon, authenticated;
+
+-- 12. REFRESH THE API SCHEMA CACHE
+NOTIFY pgrst, 'reload schema';

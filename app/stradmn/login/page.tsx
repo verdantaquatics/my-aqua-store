@@ -19,6 +19,26 @@ function AdminLoginContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [forgotMode, setForgotMode] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    try {
+      await fetch('/api/customer/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'forgot-password', email: email.toLowerCase().trim() })
+      })
+      setResetSent(true)
+    } catch {
+      setErrorMessage('Could not send the reset email. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const errorParam = searchParams.get('error')
@@ -50,47 +70,18 @@ function AdminLoginContent() {
         throw new Error('Authentication failed.')
       }
 
-      // Check staff_members table
-      const { data: staffMembers } = await supabase
-        .from('staff_members')
-        .select('*')
-        .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
-        .limit(1)
-
-      const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
-
-      if (staffMember) {
-        if (staffMember.status === 'suspended') {
-          await supabase.auth.signOut()
-          setErrorMessage('Your account is currently suspended. Please contact the store owner.')
-          setLoading(false)
-          return
-        }
+      // Staff access is decided server-side (staff_members table only)
+      const accessRes = await fetch('/api/admin/me', { cache: 'no-store' })
+      if (accessRes.ok) {
         router.push('/stradmn')
         router.refresh()
         return
       }
 
-      // Fallback founder / admin / store owner metadata
-      const metaRole = (user.user_metadata?.role || '').toLowerCase().trim()
-      const isFounder = (
-        cleanEmail === 'admin@example.com' ||
-        cleanEmail.includes('admin') ||
-        cleanEmail === 'sakib.samadhan@gmail.com' ||
-        metaRole === 'admin' ||
-        metaRole === 'shop_owner' ||
-        metaRole === 'store_owner' ||
-        metaRole === 'owner'
-      )
-
-      if (isFounder) {
-        router.push('/stradmn')
-        router.refresh()
-      } else {
-        await supabase.auth.signOut()
-        setErrorMessage('Access denied. This account does not have dashboard access permissions.')
-        setLoading(false)
-      }
+      const accessJson = await accessRes.json().catch(() => ({}))
+      await supabase.auth.signOut()
+      setErrorMessage(accessJson.error || 'Access denied. This account does not have dashboard access permissions.')
+      setLoading(false)
 
     } catch (err: any) {
       console.error(err)
@@ -119,7 +110,7 @@ function AdminLoginContent() {
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="mt-6 space-y-5">
+        <form onSubmit={forgotMode ? handleForgot : handleLogin} className="mt-6 space-y-5">
           <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -137,10 +128,20 @@ function AdminLoginContent() {
               />
             </div>
 
+            {!forgotMode && (
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setResetSent(false); setErrorMessage('') }}
+                  className="text-xs font-semibold text-brand-400 hover:text-brand-300"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   id="password"
@@ -162,7 +163,14 @@ function AdminLoginContent() {
                 </button>
               </div>
             </div>
+          )}
           </div>
+
+          {forgotMode && resetSent && (
+            <p className="text-xs font-semibold text-emerald-300 text-center bg-emerald-950/50 p-2.5 rounded border border-emerald-800/50">
+              If this email has an account, a reset link is on its way. Check your inbox and spam folder.
+            </p>
+          )}
 
           {errorMessage && (
             <p className="text-xs font-semibold text-red-400 text-center bg-red-950/50 p-2.5 rounded border border-red-800/50">
@@ -179,12 +187,21 @@ function AdminLoginContent() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
+                  {forgotMode ? 'Sending...' : 'Verifying...'}
                 </>
               ) : (
-                'Sign In to Dashboard'
+                forgotMode ? 'Email me a reset link' : 'Sign In to Dashboard'
               )}
             </button>
+            {forgotMode && (
+              <button
+                type="button"
+                onClick={() => { setForgotMode(false); setErrorMessage('') }}
+                className="mt-3 w-full text-center text-xs font-semibold text-slate-400 hover:text-slate-200"
+              >
+                Back to sign in
+              </button>
+            )}
           </div>
         </form>
       </div>

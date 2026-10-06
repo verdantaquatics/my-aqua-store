@@ -1,3 +1,5 @@
+-- NOTE: The RLS policies in this file are superseded. Always run
+-- supabase_migrate_v7_security.sql after this file to re-apply the secure policies.
 -- ========================================================================
 -- MIGRATION V6: CONSOLIDATED SETTINGS, TRACKING PIXELS & PRODUCT ENHANCEMENTS
 -- Run this migration in Supabase SQL Editor for new and existing stores

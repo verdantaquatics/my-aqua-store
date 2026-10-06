@@ -1,4 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
+import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
+import { sanitizeRichText } from '@/utils/sanitize'
 import { notFound } from 'next/navigation'
 import ProductDetailClient from '@/components/ProductDetailClient'
 
@@ -15,13 +17,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
   // Fetch product by slug
   const { data: product } = await supabase
     .from('products')
-    .select('*, categories(name, slug)')
+    .select(`${PUBLIC_PRODUCT_COLUMNS}, categories(name, slug)`)
     .eq('slug', slug)
     .single()
 
-  if (!product) {
+  if (!product || product.is_hidden) {
     notFound()
   }
+
+  product.description = sanitizeRichText(product.description)
 
   // Fetch all categories
   const { data: categories } = await supabase
@@ -35,7 +39,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   // 1. Try fetching products in the same category
   const { data: sameCategoryProducts } = await supabase
     .from('products')
-    .select('*')
+    .select(PUBLIC_PRODUCT_COLUMNS)
     .eq('category_id', product.category_id)
     .neq('id', product.id)
     .eq('is_hidden', false)
@@ -49,7 +53,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   if (relatedProducts.length < 4) {
     const { data: trendingProducts } = await supabase
       .from('products')
-      .select('*')
+      .select(PUBLIC_PRODUCT_COLUMNS)
       .neq('id', product.id)
       .eq('is_hidden', false)
       .limit(4)
@@ -67,7 +71,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <ProductDetailClient 
-      product={product} 
+      product={product as any}
       categories={categories || []} 
       relatedProducts={relatedProducts}
     />

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { normalizeStaffRole } from '@/utils/staff'
+import { StaffRole } from '@/utils/staff'
+import { resolveStaffAccess } from '@/utils/staff-access'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -33,50 +34,19 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   let isAuthorized = false
-  let userRole: 'admin' | 'shop_owner' | 'staff' = 'staff'
+  let userRole: StaffRole = 'staff'
   let isSuspended = false
 
-  if (user && user.email) {
-    const cleanEmail = user.email.toLowerCase().trim()
-    const metaRole = normalizeStaffRole(user.user_metadata?.role)
-    
-    // Check staff_members table
+  const needsStaffCheck = pathname.startsWith('/stradmn') || pathname.startsWith('/admin') || pathname === '/login'
+
+  if (user && needsStaffCheck) {
     try {
-      const { data: staffMembers } = await supabase
-        .from('staff_members')
-        .select('role, status')
-        .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
-        .limit(1)
-
-      const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
-
-      if (staffMember) {
-        if (staffMember.status === 'suspended') {
-          isSuspended = true
-        } else {
-          isAuthorized = true
-          userRole = normalizeStaffRole(staffMember.role || metaRole)
-        }
-      } else {
-        // Fallback for primary founder/admin or metadata shop_owner
-        const isFounder = (
-          cleanEmail === 'sakib.samadhan@gmail.com' ||
-          cleanEmail === 'admin@example.com' ||
-          cleanEmail.includes('admin') ||
-          metaRole === 'admin' ||
-          metaRole === 'shop_owner'
-        )
-        if (isFounder) {
-          isAuthorized = true
-          userRole = metaRole === 'admin' ? 'admin' : 'shop_owner'
-        }
-      }
+      const access = await resolveStaffAccess(user)
+      isSuspended = access.status === 'suspended'
+      isAuthorized = access.status === 'active'
+      if (access.role) userRole = access.role
     } catch {
-      // Fallback
-      if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail.includes('admin') || metaRole === 'shop_owner' || metaRole === 'admin') {
-        isAuthorized = true
-        userRole = metaRole === 'admin' ? 'admin' : 'shop_owner'
-      }
+      // Fail closed: treat as unauthorized
     }
   }
 

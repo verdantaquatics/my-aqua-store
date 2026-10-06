@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
+import { sanitizeRichText } from '@/utils/sanitize'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await request.json()
+    if (payload.description !== undefined) payload.description = sanitizeRichText(payload.description)
 
     // Use admin client to bypass RLS policies
     const adminDb = createAdminClient()
@@ -74,6 +76,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, ...payload } = await request.json()
+    if (payload.description !== undefined) payload.description = sanitizeRichText(payload.description)
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
     }

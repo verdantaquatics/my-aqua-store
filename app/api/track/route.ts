@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
 import { restoreOrderInventory } from '@/utils/inventory'
+import { phoneVariants } from '@/utils/postgrest'
+
+const TRACK_COLUMNS = 'id, created_at, customer_name, customer_phone, shipping_address, order_status, payment_status, payment_method, payment_details, total_price, delivery_charge, discount_amount, shipping_provider, pathao_status, pathao_consignment_id, steadfast_consignment_id, steadfast_tracking_code, order_items(id, quantity, price, selected_variations, products(name, images))'
+
+function maskPhone(phone = '') {
+  return phone.length > 5 ? `${phone.slice(0, 3)}${'*'.repeat(phone.length - 6)}${phone.slice(-3)}` : '***'
+}
+
+// Only what the tracking page needs. Lookups by phone or short ID hide the full
+// address/phone, since those identifiers are easy to know or guess.
+function toPublicOrder(order: any, full: boolean) {
+  const { payment_details, ...rest } = order
+  return {
+    ...rest,
+    payment_details: payment_details?.advance_paid !== undefined ? { advance_paid: payment_details.advance_paid } : {},
+    customer_name: full ? order.customer_name : String(order.customer_name || '').split(' ')[0],
+    customer_phone: full ? order.customer_phone : maskPhone(order.customer_phone || ''),
+    shipping_address: full ? order.shipping_address : 'Hidden for privacy. Search with the full Order ID from your invoice to see it.'
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const rawQuery = (searchParams.get('query') || '').trim()
 
-    if (!rawQuery || rawQuery.length < 3) {
+    if (!rawQuery || rawQuery.length < 8 || rawQuery.length > 64) {
       return NextResponse.json({ error: 'Please enter a valid Order ID or Phone number' }, { status: 400 })
     }
 
@@ -21,13 +41,18 @@ export async function GET(request: NextRequest) {
     const digitsOnly = rawQuery.replace(/\D/g, '')
 
     let orders: any[] = []
+    let fullDetails = false
 
-    if (isNumericQuery && digitsOnly.length >= 6) {
-      // Search by phone number (e.g. 017XXXXXXXX or last 6+ digits)
+    if (isNumericQuery) {
+      // Search by the complete mobile number only (e.g. 017XXXXXXXX)
+      const local = digitsOnly.startsWith('88') ? digitsOnly.slice(2) : digitsOnly
+      if (local.length !== 11) {
+        return NextResponse.json({ error: 'Please enter your full 11-digit mobile number or Order ID' }, { status: 400 })
+      }
       const { data, error } = await adminDb
         .from('orders')
-        .select('*, order_items(*, products(name, images))')
-        .ilike('customer_phone', `%${digitsOnly}%`)
+        .select(TRACK_COLUMNS)
+        .in('customer_phone', phoneVariants(local))
         .order('created_at', { ascending: false })
         .limit(10)
 
@@ -41,9 +66,10 @@ export async function GET(request: NextRequest) {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawQuery)
 
       if (isUUID) {
+        fullDetails = true
         const { data, error } = await adminDb
           .from('orders')
-          .select('*, order_items(*, products(name, images))')
+          .select(TRACK_COLUMNS)
           .eq('id', rawQuery)
           .limit(1)
 
@@ -53,21 +79,23 @@ export async function GET(request: NextRequest) {
           orders = data
         }
       } else {
-        // Short ID prefix search (e.g. 8 characters)
-        const cleanQuery = rawQuery.toLowerCase()
+        // Short ID prefix search (the 8-character ID printed on invoices)
+        const cleanQuery = rawQuery.toLowerCase().replace(/^#/, '')
+        if (!/^[0-9a-f-]{8,}$/.test(cleanQuery)) {
+          return NextResponse.json({ success: true, orders: [] })
+        }
         const { data, error } = await adminDb
           .from('orders')
-          .select('*, order_items(*, products(name, images))')
+          .select(TRACK_COLUMNS)
           .order('created_at', { ascending: false })
-          .limit(100)
+          .limit(500)
 
         if (error) {
           console.error('Track prefix error:', error)
         } else if (data) {
-          orders = data.filter((o: any) => 
-            o.id.toLowerCase().startsWith(cleanQuery) || 
-            o.id.replace(/-/g, '').toLowerCase().startsWith(cleanQuery) ||
-            (o.customer_phone && o.customer_phone.includes(rawQuery))
+          orders = data.filter((o: any) =>
+            o.id.toLowerCase().startsWith(cleanQuery) ||
+            o.id.replace(/-/g, '').toLowerCase().startsWith(cleanQuery.replace(/-/g, ''))
           )
         }
       }
@@ -119,10 +147,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, orders })
+    return NextResponse.json({ success: true, orders: orders.map((o) => toPublicOrder(o, fullDetails)) })
 
   } catch (error: any) {
     console.error('Order tracking API error:', error)
-    return NextResponse.json({ error: error.message || 'Error looking up order' }, { status: 500 })
+    return NextResponse.json({ error: 'Error looking up order' }, { status: 500 })
   }
 }

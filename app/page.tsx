@@ -1,9 +1,11 @@
 import { createAdminClient } from '@/utils/supabase/server'
+import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
 import HomePageClient from '@/components/HomePageClient'
 
 export const revalidate = 0 // Disable cache to get live inventory status
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
+  const { search = '' } = await searchParams
   const supabase = createAdminClient()
 
   // Fetch Categories
@@ -15,7 +17,7 @@ export default async function HomePage() {
   // Fetch Products
   const { data: products } = await supabase
     .from('products')
-    .select('*')
+    .select(PUBLIC_PRODUCT_COLUMNS)
     .order('created_at', { ascending: false })
 
   // Fetch non-cancelled order items for Best Seller & Trending calculations
@@ -44,7 +46,9 @@ export default async function HomePage() {
   }
 
   return (
-    <HomePageClient 
+    <HomePageClient
+      key={search}
+      initialSearch={search}
       products={products || []} 
       categories={categories || []}
       allTimeSales={allTimeSales}

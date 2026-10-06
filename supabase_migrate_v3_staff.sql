@@ -1,3 +1,5 @@
+-- NOTE: The RLS policies in this file are superseded. Always run
+-- supabase_migrate_v7_security.sql after this file to re-apply the secure policies.
 -- ==========================================
 -- AQUASTORE / WHITE-LABEL DB MIGRATION: V3 STAFF & RBAC
 -- Run this in your Supabase SQL Editor
@@ -32,9 +34,5 @@ CREATE POLICY "Allow authenticated read staff" ON public.staff_members
 CREATE POLICY "Allow admin manage staff" ON public.staff_members 
     FOR ALL TO authenticated USING (true);
 
--- 4. SEED INITIAL SUPERADMIN / OWNER (If not already present)
-INSERT INTO public.staff_members (email, full_name, role, status)
-VALUES 
-    ('sakib.samadhan@gmail.com', 'Store Founder', 'shop_owner', 'active'),
-    ('admin@example.com', 'System Administrator', 'admin', 'active')
-ON CONFLICT (email) DO NOTHING;
+-- 4. OWNER ACCOUNT
+-- The store owner row is created by section 9 of supabase_setup.sql.

@@ -21,9 +21,11 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
+const NO_CATEGORIES: CategoryItem[] = []
+
 export function StoreProvider({
   initialSettings,
-  initialCategories = [],
+  initialCategories = NO_CATEGORIES,
   children
 }: {
   initialSettings: PublicStoreSettings
@@ -34,6 +36,16 @@ export function StoreProvider({
   const [categories, setCategories] = useState<CategoryItem[]>(initialCategories)
   const [isAdmin, setIsAdmin] = useState(false)
   const supabase = createClient()
+
+  // The root layout persists across navigations and router.refresh(), so re-sync
+  // when the server sends fresh settings (e.g. after saving in the dashboard)
+  useEffect(() => {
+    setSettings(initialSettings)
+  }, [initialSettings])
+
+  useEffect(() => {
+    setCategories(initialCategories)
+  }, [initialCategories])
 
   useEffect(() => {
     // Check if user is logged in as staff/owner/admin for floating pill

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
 import { restoreOrderInventory } from '@/utils/inventory'
+import { verifyStaffAuth } from '@/utils/auth'
+import { isAuthorizedCronRequest } from '@/utils/cron'
 
 export const dynamic = 'force-dynamic'
 
@@ -235,11 +237,8 @@ async function performCourierSync(): Promise<{
 // GET: Handled by Cron runner (e.g. cron-job.org / Vercel / External Scheduler)
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (process.env.CRON_SECRET) {
-      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
-      }
+    if (!isAuthorizedCronRequest(request)) {
+      return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
     }
 
     const summary = await performCourierSync()
@@ -253,6 +252,14 @@ export async function GET(request: NextRequest) {
 // POST: Triggered on-demand by Admin or Webhooks
 export async function POST(request: NextRequest) {
   try {
+    // On-demand runs: a cron caller with the secret, or a signed-in staff member
+    if (!isAuthorizedCronRequest(request)) {
+      const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+      if (!auth.authorized) {
+        return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+      }
+    }
+
     const summary = await performCourierSync()
     return NextResponse.json(summary)
   } catch (err: any) {

@@ -3,12 +3,18 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { getStoreSettings } from '@/utils/settings'
 import { bookSteadfastConsignment } from '@/utils/courier'
 import axios from 'axios'
+import { verifyStaffAuth } from '@/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
 // POST: Manual dispatch from Admin
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const { order_id } = await request.json()
 
@@ -56,15 +62,25 @@ export async function POST(request: NextRequest) {
     }
   } catch (err: any) {
     console.error('Steadfast Route Error:', err)
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 // GET: Check tracking status
 export async function GET(request: NextRequest) {
+  const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
   const { searchParams } = new URL(request.url)
   const cid = searchParams.get('cid')
   const trackingCode = searchParams.get('tracking_code')
+
+  // Values are placed in the URL path, so only allow plain identifiers
+  if ((cid && !/^[A-Za-z0-9_-]+$/.test(cid)) || (trackingCode && !/^[A-Za-z0-9_-]+$/.test(trackingCode))) {
+    return NextResponse.json({ error: 'Invalid consignment or tracking code' }, { status: 400 })
+  }
 
   const settings = await getStoreSettings()
   const { steadfast_api_key, steadfast_secret_key, steadfast_base_url } = settings

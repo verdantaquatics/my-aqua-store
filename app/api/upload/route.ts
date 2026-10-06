@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    const folder = (formData.get('folder') as string) || 'uploads'
+    // Folder becomes part of the storage path: allow simple names only
+    const rawFolder = String(formData.get('folder') || 'uploads')
+    const folder = /^[a-z0-9_-]{1,40}$/i.test(rawFolder) ? rawFolder : 'uploads'
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -32,7 +34,6 @@ export async function POST(request: NextRequest) {
       'image/png',
       'image/webp',
       'image/gif',
-      'image/svg+xml',
       'video/mp4',
       'video/webm',
       'video/quicktime'
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: `Unsupported file type: ${file.type}. Allowed: JPG, PNG, WebP, GIF, SVG, MP4, WebM.` },
+        { error: `Unsupported file type: ${file.type}. Allowed: JPG, PNG, WebP, GIF, MP4, WebM.` },
         { status: 400 }
       )
     }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
-      return NextResponse.json({ error: uploadError.message || 'Upload failed' }, { status: 500 })
+      return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
     }
 
     // Get public URL
@@ -97,6 +98,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Upload error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error during upload' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error during upload' }, { status: 500 })
   }
 }

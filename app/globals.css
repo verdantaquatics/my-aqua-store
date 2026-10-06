@@ -50,3 +50,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Storefront image protection (see components/ImageProtection.tsx) */
+.protect-images img,
+.protect-images video {
+  -webkit-touch-callout: none; /* iOS long-press "Save Image" */
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

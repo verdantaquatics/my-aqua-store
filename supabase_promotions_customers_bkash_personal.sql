@@ -1,3 +1,5 @@
+-- NOTE: The RLS policies in this file are superseded. Always run
+-- supabase_migrate_v7_security.sql after this file to re-apply the secure policies.
 -- ==============================================================================
 -- MIGRATION: PROMOTIONS, CUSTOMERS, WISHLIST, BKASH PERSONAL & EMAIL SETTINGS
 -- ==============================================================================

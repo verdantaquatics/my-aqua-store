@@ -16,6 +16,7 @@ import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { useCustomer } from '@/context/CustomerContext'
 import axios from 'axios'
+import { isFlatDelivery, getFlatDeliveryCharge, getDeliveryCharge } from '@/utils/delivery'
 
 interface City {
   city_id: number
@@ -87,7 +88,7 @@ export default function CheckoutPage() {
   const isBkashPersonalAllowed = Boolean(settings.bkash_personal_enabled && settings.bkash_personal_number)
   const requireDeliveryPrepay = isCodAllowed && settings.cod_prepay_delivery !== false
 
-  const [deliveryCharge, setDeliveryCharge] = useState<number>(settings.delivery_charge_inside_dhaka || 60)
+  const [deliveryCharge, setDeliveryCharge] = useState<number>(getDeliveryCharge(settings, true))
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BKASH' | 'BKASH_PERSONAL'>(() => {
     if (isCodAllowed) return 'COD'
     if (isBkashPersonalAllowed) return 'BKASH_PERSONAL'
@@ -122,10 +123,14 @@ export default function CheckoutPage() {
 
   // Update delivery charge for Simple Region mode (when Pathao is off)
   useEffect(() => {
+    if (isFlatDelivery(settings)) {
+      setDeliveryCharge(getFlatDeliveryCharge(settings))
+      return
+    }
     if (!isPathaoActive) {
       const charge = deliveryRegion === 'inside_dhaka'
-        ? Number(settings.delivery_charge_inside_dhaka || 60)
-        : Number(settings.delivery_charge_outside_dhaka || 120)
+        ? Number(settings.delivery_charge_inside_dhaka ?? 0)
+        : Number(settings.delivery_charge_outside_dhaka ?? 0)
       setDeliveryCharge(charge)
     }
   }, [deliveryRegion, isPathaoActive, settings])
@@ -186,14 +191,14 @@ export default function CheckoutPage() {
 
   // Update Pathao dynamic delivery charge when city changes
   useEffect(() => {
-    if (!isPathaoActive) return
+    if (!isPathaoActive || isFlatDelivery(settings)) return
     if (!selectedCity) {
-      setDeliveryCharge(Number(settings.delivery_charge_inside_dhaka || 60))
+      setDeliveryCharge(Number(settings.delivery_charge_inside_dhaka ?? 0))
       return
     }
 
     const currentCityObj = cities.find((c) => String(c.city_id) === String(selectedCity))
-    const baseCityName = (settings.store_city_name || 'Dhaka').toLowerCase().trim()
+    const baseCityName = (settings.store_city_name || '').toLowerCase().trim()
     const customerCityName = currentCityObj?.city_name?.toLowerCase().trim() || ''
 
     const isStoreCity = customerCityName
@@ -201,9 +206,9 @@ export default function CheckoutPage() {
       : String(selectedCity) === String(settings.store_city_id || '1')
 
     if (isStoreCity) {
-      setDeliveryCharge(Number(settings.delivery_charge_inside_dhaka || 60))
+      setDeliveryCharge(Number(settings.delivery_charge_inside_dhaka ?? 0))
     } else {
-      setDeliveryCharge(Number(settings.delivery_charge_outside_dhaka || 120))
+      setDeliveryCharge(Number(settings.delivery_charge_outside_dhaka ?? 0))
     }
   }, [isPathaoActive, selectedCity, cities, settings])
 
@@ -218,7 +223,9 @@ export default function CheckoutPage() {
       const res = await axios.post('/api/promo/validate', {
         code: promoCodeInput.trim(),
         cartItems,
-        deliveryCharge,
+        delivery_region: deliveryRegion,
+        city_id: Number(selectedCity || 0),
+        city_name: cities.find((c) => String(c.city_id) === String(selectedCity))?.city_name || '',
         customer_phone: customerPhone || customer?.phone || '',
         customer_email: customerEmail || customer?.email || '',
         user_id: customer?.user_id || customer?.id || null
@@ -314,7 +321,9 @@ export default function CheckoutPage() {
         zoneName = zones.find((z) => String(z.zone_id) === String(selectedZone))?.zone_name || ''
         areaName = areas.find((a) => String(a.area_id) === String(selectedArea))?.area_name || ''
       } else {
-        cityName = deliveryRegion === 'inside_dhaka' ? 'Dhaka' : 'Outside Dhaka'
+        cityName = deliveryRegion === 'inside_dhaka'
+          ? (settings.store_city_name || settings.shipping_zone_1_label || '')
+          : (settings.shipping_zone_2_label || '')
       }
 
       // If guest chose to create an account, register customer before or with order
@@ -361,6 +370,7 @@ export default function CheckoutPage() {
         city_name: cityName,
         zone_name: zoneName,
         area_name: areaName,
+        delivery_region: deliveryRegion,
         delivery_charge: deliveryCharge,
         total_price: finalTotal,
         payment_method: paymentMethod,
@@ -569,8 +579,15 @@ export default function CheckoutPage() {
                     </h2>
                   </div>
 
-                  {/* If Pathao is OFF: Simple Region Selector */}
-                  {!isPathaoActive ? (
+                  {/* Flat rate (Pathao off): no region choice needed */}
+                  {!isPathaoActive && isFlatDelivery(settings) ? (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/40">
+                      <span className="text-xs font-bold text-slate-900">
+                        {isBangla ? 'সারা বাংলাদেশে ডেলিভারি' : 'Delivery anywhere in Bangladesh'}
+                      </span>
+                      <span className="text-xs font-black text-brand-700">৳{isBangla ? toBengaliDigits(getFlatDeliveryCharge(settings)) : getFlatDeliveryCharge(settings)}</span>
+                    </div>
+                  ) : !isPathaoActive ? (
                     <div className="space-y-3">
                       <label className="text-xs font-semibold text-slate-600 uppercase block">{t('checkout.delivery_region')} *</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

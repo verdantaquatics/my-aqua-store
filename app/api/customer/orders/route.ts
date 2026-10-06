@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/utils/supabase/server'
+import { ilikeExact } from '@/utils/postgrest'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,33 +16,22 @@ export async function GET() {
     const adminDb = createAdminClient()
     const cleanEmail = user.email?.toLowerCase().trim() || ''
 
-    // 1. Get customer record to also know customer phone
+    // 1. Resolve the customer record linked to this login
     const { data: customer } = await adminDb
       .from('customers')
-      .select('*')
-      .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+      .select('id')
+      .or(`user_id.eq.${user.id},email.ilike.${ilikeExact(cleanEmail)}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    const conditions: string[] = [`user_id.eq.${user.id}`, `customer_email.ilike.${cleanEmail}`]
-
-    if (customer?.id) {
-      conditions.push(`customer_id.eq.${customer.id}`)
-    }
-    if (customer?.phone) {
-      // Normalize phone: extract digits, handle +88, 88, and local 01... formats
-      const rawDigits = customer.phone.replace(/\D/g, '')
-      const localPhone = rawDigits.startsWith('88') ? rawDigits.slice(2) : rawDigits
-      const intlPhone = rawDigits.startsWith('88') ? rawDigits : '88' + rawDigits
-      const plusIntlPhone = '+' + intlPhone
-
-      // Match any of the formats the phone might be stored in
-      conditions.push(`customer_phone.eq.${customer.phone}`)
-      if (localPhone !== customer.phone) conditions.push(`customer_phone.eq.${localPhone}`)
-      if (intlPhone !== customer.phone) conditions.push(`customer_phone.eq.${intlPhone}`)
-      if (plusIntlPhone !== customer.phone) conditions.push(`customer_phone.eq.${plusIntlPhone}`)
-    }
+    // Only orders linked to this account (or placed with its login email) are returned.
+    // Guest orders placed with the customer's phone are linked to the account at
+    // signup/login; matching on the editable profile phone here would let anyone
+    // read other people's orders by changing their phone number.
+    const conditions: string[] = [`user_id.eq.${user.id}`]
+    if (cleanEmail) conditions.push(`customer_email.ilike.${ilikeExact(cleanEmail)}`)
+    if (customer?.id) conditions.push(`customer_id.eq.${customer.id}`)
 
     // 2. Fetch orders
     const { data: orders, error: ordersErr } = await adminDb
@@ -55,6 +45,6 @@ export async function GET() {
     return NextResponse.json({ orders: orders || [] })
   } catch (error: any) {
     console.error('Customer orders fetch error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to fetch customer orders' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch customer orders' }, { status: 500 })
   }
 }

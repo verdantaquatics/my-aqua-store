@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useLanguage } from '@/context/LanguageContext'
+import { resolveVariantSelection } from '@/utils/variations'
+import { useStore } from '@/context/StoreContext'
 import ProductCard, { Product, Category, extractProductOptions } from '@/components/ProductCard'
 
 interface ShowcaseSectionProps {
@@ -33,6 +35,8 @@ function CarouselHeroBanner({
 }) {
   const { addToCart } = useCart()
   const { t, toBengaliDigits, isBangla } = useLanguage()
+  const { settings } = useStore()
+  const overlay = Math.min(100, Math.max(0, settings.showcase_overlay_opacity ?? 60)) / 100
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
@@ -112,12 +116,13 @@ function CarouselHeroBanner({
   const handleConfirmVariantAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    const variant = resolveVariantSelection(activeProduct, selectedVariations)
     addToCart({
       id: activeProduct.id,
       name: activeProduct.name,
       slug: activeProduct.slug,
-      price: Number(activeProduct.price),
-      image: activeProduct.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5',
+      price: variant.price,
+      image: variant.image || activeProduct.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5',
       selectedVariations
     }, 1)
     setShowVariantModal(false)
@@ -155,9 +160,13 @@ function CarouselHeroBanner({
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-all duration-1000 ease-out animate-fadeIn"
         />
         
-        {/* High-contrast multi-layer gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30" />
-        <div className="absolute inset-0 bg-black/10 backdrop-brightness-95" />
+        {/* Gradient overlay for text readability (strength set in Settings, 0 = none) */}
+        {overlay > 0 && (
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(to top, rgba(0,0,0,${overlay}) 0%, rgba(0,0,0,${overlay * 0.5}) 50%, rgba(0,0,0,${overlay * 0.33}) 100%)` }}
+          />
+        )}
       </div>
 
       {/* 2. TOP BADGE & SALE PILL */}

@@ -9,9 +9,10 @@ import CartDrawer from '@/components/CartDrawer'
 import { useCart } from '@/context/CartContext'
 import { useCustomer } from '@/context/CustomerContext'
 import { useStore } from '@/context/StoreContext'
-import { parseProductVariations, VariationOption } from '@/components/AdminProductsClient'
+import { parseProductVariations, VariationOption } from '@/utils/variations'
 import ProductCard from '@/components/ProductCard'
 import { useLanguage } from '@/context/LanguageContext'
+import { describeDeliveryCharges } from '@/utils/delivery'
 
 interface Product {
   id: string
@@ -426,8 +427,8 @@ export default function ProductDetailClient({ product, categories, relatedProduc
               </div>
               <p className="leading-relaxed text-slate-500">
                 {isBangla
-                  ? `সারা বাংলাদেশে দ্রুত ও নিরাপদ হোম ডেলিভারি। ডেলিভারি চার্জ ঢাকার ভিতরে ৳${toBengaliDigits(settings.delivery_charge_inside_dhaka || 0)} এবং ঢাকার বাইরে ৳${toBengaliDigits(settings.delivery_charge_outside_dhaka || 0)}।`
-                  : `Fast and reliable doorstep delivery across Bangladesh. Delivery charge is ৳${settings.delivery_charge_inside_dhaka} inside Dhaka, and ৳${settings.delivery_charge_outside_dhaka} outside Dhaka.`}
+                  ? `সারা বাংলাদেশে দ্রুত ও নিরাপদ হোম ডেলিভারি। ডেলিভারি চার্জ ${describeDeliveryCharges(settings, true, toBengaliDigits)}।`
+                  : `Fast and reliable doorstep delivery across Bangladesh. Delivery charge: ${describeDeliveryCharges(settings)}.`}
               </p>
             </div>
 

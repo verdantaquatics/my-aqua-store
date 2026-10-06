@@ -10,8 +10,15 @@ DO $$
 DECLARE
     staff RECORD;
     v_user_id UUID;
-    v_default_pw TEXT := 'Sakib@9700'; -- Default password for staff accounts
+    -- Temporary password for newly created staff logins. Set a strong one-off value
+    -- before running, never commit it, and ask staff to reset it after first login.
+    -- (Adding staff from the dashboard's Staff page is preferred over this script.)
+    v_default_pw TEXT := 'CHANGE_ME';
 BEGIN
+    IF v_default_pw = 'CHANGE_ME' OR length(v_default_pw) < 12 THEN
+        RAISE EXCEPTION 'Set v_default_pw to a strong temporary password (12+ chars) before running this script.';
+    END IF;
+
     FOR staff IN SELECT * FROM public.staff_members LOOP
         -- Check if user exists in auth.users
         SELECT id INTO v_user_id FROM auth.users WHERE email = staff.email;

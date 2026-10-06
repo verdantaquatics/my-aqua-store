@@ -1,112 +1,11 @@
--- SQL Script to set up database schema and seed data in Supabase (PostgreSQL)
-
--- 1. ENABLE EXTENSIONS
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 2. CREATE CATEGORIES TABLE
-CREATE TABLE IF NOT EXISTS public.categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL UNIQUE,
-    slug VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 3. CREATE PRODUCTS TABLE
-CREATE TABLE IF NOT EXISTS public.products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    category_id UUID NOT NULL REFERENCES public.categories(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    old_price NUMERIC(10, 2) DEFAULT 0.00,
-    stock INT NOT NULL DEFAULT 0,
-    images TEXT[] DEFAULT ARRAY[]::TEXT[],
-    variations JSONB DEFAULT '{}'::JSONB, -- E.g. {"sizes": ["1.5ft", "2ft"], "colors": ["black", "white"]}
-    is_featured BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 4. CREATE ORDERS TABLE
-CREATE TABLE IF NOT EXISTS public.orders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- Nullable for guest checkouts
-    customer_name VARCHAR(255) NOT NULL,
-    customer_phone VARCHAR(50) NOT NULL,
-    customer_email VARCHAR(255),
-    shipping_address TEXT NOT NULL,
-    city_id INT NOT NULL,
-    zone_id INT NOT NULL,
-    area_id INT NOT NULL,
-    delivery_charge NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    total_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    payment_method VARCHAR(50) NOT NULL DEFAULT 'COD', -- 'COD' or 'BKASH'
-    payment_status VARCHAR(50) NOT NULL DEFAULT 'Pending', -- 'Pending', 'DeliveryChargePrePaid', 'FullyPaid', 'Failed'
-    payment_details JSONB DEFAULT '{}'::JSONB, -- bkash payment transaction id, number, payload etc
-    pathao_consignment_id VARCHAR(255), -- Pathao parcel tracking code
-    pathao_status VARCHAR(100) DEFAULT 'pending', -- Pathao status (e.g. pending, dispatched, delivered)
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 5. CREATE ORDER ITEMS TABLE
-CREATE TABLE IF NOT EXISTS public.order_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
-    quantity INT NOT NULL DEFAULT 1,
-    price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    selected_variations JSONB DEFAULT '{}'::JSONB, -- E.g. {"size": "2ft", "color": "black"}
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 6. SET UP ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
-
--- Categories: Read for everyone, Write for authenticated Admins only
-CREATE POLICY "Allow public read categories" ON public.categories 
-    FOR SELECT USING (true);
-
-CREATE POLICY "Allow admin write categories" ON public.categories 
-    FOR ALL TO authenticated USING (auth.jwt()->>'email' = 'admin@example.com' OR auth.jwt()->>'role' = 'service_role');
-
--- Products: Read for everyone, Write for authenticated Admins only
-CREATE POLICY "Allow public read products" ON public.products 
-    FOR SELECT USING (true);
-
-CREATE POLICY "Allow admin write products" ON public.products 
-    FOR ALL TO authenticated USING (auth.jwt()->>'email' = 'admin@example.com' OR auth.jwt()->>'role' = 'service_role');
-
--- Orders: Users can view their own orders, Admins can view/edit all orders
-CREATE POLICY "Allow users to insert their own orders" ON public.orders
-    FOR INSERT WITH CHECK (true); -- Anyone can place an order (guest checkouts)
-
-CREATE POLICY "Allow users to view their own orders" ON public.orders
-    FOR SELECT USING (auth.uid() = user_id OR auth.jwt()->>'email' = 'admin@example.com');
-
-CREATE POLICY "Allow admin to manage all orders" ON public.orders
-    FOR ALL TO authenticated USING (auth.jwt()->>'email' = 'admin@example.com');
-
--- Order Items: Users can view/insert their own items, Admins can manage all
-CREATE POLICY "Allow anyone to insert order items" ON public.order_items
-    FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Allow users to view their own order items" ON public.order_items
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.orders 
-            WHERE orders.id = order_items.order_id 
-            AND (orders.user_id = auth.uid() OR auth.jwt()->>'email' = 'admin@example.com')
-        )
-    );
-
-CREATE POLICY "Allow admin to manage order items" ON public.order_items
-    FOR ALL TO authenticated USING (auth.jwt()->>'email' = 'admin@example.com');
-
--- 7. SEED DATA GENERATION
+-- ==============================================================================
+-- OPTIONAL DEMO CATALOG (aquarium store sample data)
+-- Run AFTER supabase_setup.sql, only if you want sample categories & products
+-- for a demo / staging site. Skip it for a real store.
+--
+-- Table definitions, security policies and functions all live in
+-- supabase_setup.sql - this file only inserts data.
+-- ==============================================================================
 
 -- Insert Categories
 INSERT INTO public.categories (id, name, slug, description) VALUES
@@ -165,14 +64,3 @@ INSERT INTO public.products (category_id, name, slug, description, price, old_pr
 ('c0000000-0000-0000-0000-000000000007', 'Water Dechlorinator / Conditioner', 'water-dechlorinator-conditioner', 'Instantly removes toxic chlorine, chloramines, and heavy metals from tap water.', 350.00, 400.00, 50, true, '{"volume": ["100ml Bottle", "250ml Bottle"]}', ARRAY['https://images.unsplash.com/photo-1522069169874-c58ec4b76be5']),
 ('c0000000-0000-0000-0000-000000000007', 'Liquid Micro & Macro Plant Fertilizer', 'liquid-micro-macro-plant-fertilizer', 'All-in-one liquid fertilizer supplying essential minerals to aquarium plants.', 450.00, 500.00, 35, false, '{"volume": ["150ml Bottle", "300ml Bottle"]}', ARRAY['https://images.unsplash.com/photo-1522069169874-c58ec4b76be5'])
 ON CONFLICT (slug) DO NOTHING;
-
--- 8. CREATE DECREMENT STOCK FUNCTION FOR ORDER PROCESSING
-CREATE OR REPLACE FUNCTION decrement_product_stock(prod_id UUID, qty INT)
-RETURNS VOID AS $$
-BEGIN
-  UPDATE public.products
-  SET stock = GREATEST(0, stock - qty)
-  WHERE id = prod_id;
-END;
-$$ LANGUAGE plpgsql;
-

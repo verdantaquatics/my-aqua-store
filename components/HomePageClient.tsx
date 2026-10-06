@@ -11,6 +11,7 @@ import ProductCard from '@/components/ProductCard'
 import ShowcaseSection from '@/components/ShowcaseSection'
 import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
+import { getDescendantIds } from '@/utils/categories'
 
 interface Product {
   id: string
@@ -41,14 +42,15 @@ interface HomePageClientProps {
   categories: Category[]
   allTimeSales?: Record<string, number>
   last30DaysSales?: Record<string, number>
+  initialSearch?: string
 }
 
-export default function HomePageClient({ products, categories, allTimeSales = {}, last30DaysSales = {} }: HomePageClientProps) {
+export default function HomePageClient({ products, categories, allTimeSales = {}, last30DaysSales = {}, initialSearch = '' }: HomePageClientProps) {
   const router = useRouter()
   const { settings } = useStore()
   const { t, toBengaliDigits, isBangla } = useLanguage()
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState<string>(initialSearch)
   const [cartDrawerOpen, setCartDrawerOpen] = useState<boolean>(false)
 
   // Visible products
@@ -103,13 +105,10 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
     if (selectedCategoryId === 'all') return true
 
     // Find all children of the selected category
-    const matchingCategoryIds = [
-      selectedCategoryId,
-      ...categories.filter((c) => c.parent_id === selectedCategoryId).map((c) => c.id)
-    ]
+    const matchingCategoryIds = [selectedCategoryId, ...getDescendantIds(selectedCategoryId, categories)]
 
     const productCatIds: string[] = Array.isArray(product.variations?.category_ids)
-      ? product.variations.category_ids
+      ? [...product.variations.category_ids]
       : product.category_id ? [product.category_id] : []
 
     if (product.is_featured && !productCatIds.includes('c0000000-0000-0000-0000-000000000008')) {
@@ -121,6 +120,14 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
 
   // Top level categories for the pill bar
   const parentCategories = categories.filter((c) => !c.parent_id)
+
+  // The full catalog grid is optional; it always shows while searching since it renders the results
+  const showCatalog = settings.show_all_products || searchQuery.trim().length > 0
+  const shopNowHref = showCatalog ? '#catalog' : settings.show_featured ? '/featured' : '#top-product-search'
+
+  // Scales the left-side gradient with the overlay setting (35% = original look, 0% = none)
+  const heroOverlay = (settings.hero_overlay_opacity ?? 35) / 100
+  const heroGradientStrength = Math.min(1, heroOverlay / 0.35)
 
   const renderProductCard = (product: Product) => (
     <ProductCard
@@ -145,9 +152,14 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
         )}
         <div 
           className="absolute inset-0 z-[1]"
-          style={{ backgroundColor: `rgba(2, 6, 23, ${((settings as any).hero_overlay_opacity ?? 35) / 100})` }}
+          style={{ backgroundColor: `rgba(2, 6, 23, ${heroOverlay})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent z-[1]" />
+        <div
+          className="absolute inset-0 z-[1]"
+          style={{
+            background: `linear-gradient(to right, rgba(2, 6, 23, ${0.8 * heroGradientStrength}), rgba(2, 6, 23, ${0.4 * heroGradientStrength}), transparent)`
+          }}
+        />
         
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
@@ -167,7 +179,7 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
             </p>
             <div className="mt-8 flex items-center gap-x-4">
               <Link
-                href="#catalog"
+                href={shopNowHref}
                 className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-brand-500 transition-all"
               >
                 {t('hero.shop_now')}
@@ -247,6 +259,7 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       )}
 
       {/* ALL PRODUCTS MAIN CATALOG SECTION */}
+      {showCatalog ? (
       <main id="catalog" className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
         
         {/* Catalog Header */}
@@ -303,6 +316,9 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
           </div>
         )}
       </main>
+      ) : (
+        <div id="catalog" className="flex-1" />
+      )}
 
       {/* DYNAMIC FOOTER */}
       <Footer />

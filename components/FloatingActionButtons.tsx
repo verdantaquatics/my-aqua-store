@@ -10,8 +10,8 @@ export default function FloatingActionButtons() {
   const { settings } = useStore()
   const [showGoTop, setShowGoTop] = useState(false)
 
-  // Hide on admin routes
-  const isAdmin = pathname?.startsWith('/stradmn')
+  // Hide on admin routes and on the printable invoice (it was overlaying / printing onto invoices)
+  const isHidden = pathname?.startsWith('/stradmn') || pathname?.startsWith('/invoice')
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,7 +21,7 @@ export default function FloatingActionButtons() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  if (isAdmin) return null
+  if (isHidden) return null
 
   const whatsappNumber = settings.contact_whatsapp || settings.contact_phone || ''
   const whatsappUrl = whatsappNumber
@@ -38,7 +38,7 @@ export default function FloatingActionButtons() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3 print:hidden">
       {/* Go-To-Top Button */}
       <button
         type="button"

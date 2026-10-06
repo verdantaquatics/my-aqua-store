@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/utils/supabase/server'
+import { ilikeExact } from '@/utils/postgrest'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ async function getAuthenticatedCustomerId() {
   const { data: customer } = await adminDb
     .from('customers')
     .select('id')
-    .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+    .or(`user_id.eq.${user.id},email.ilike.${ilikeExact(cleanEmail)}`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

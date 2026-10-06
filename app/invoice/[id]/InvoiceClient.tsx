@@ -165,7 +165,7 @@ export default function InvoiceClient({ order, settings }: InvoiceClientProps) {
                 {settings.hero_title ? `${settings.hero_title} - ${settings.hero_subtitle}` : settings.store_tagline}
               </p>
               <p className="text-xs text-slate-500 print:text-black mt-1.5 leading-relaxed">
-                {settings.contact_address ? settings.contact_address : 'Dhaka, Bangladesh'}<br />
+                {settings.contact_address || `${settings.store_city_name || 'Khulna'}, Bangladesh`}<br />
                 Delivery via <strong className="text-slate-700 print:text-black">{
                   order.shipping_provider === 'steadfast' 
                     ? 'Steadfast Courier' 

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/utils/supabase/server'
+import { isStaffEmail } from '@/utils/staff-access'
+import { requestPasswordReset } from '@/utils/password-reset'
+import { orValue, ilikeExact, cleanPhoneNumber, phoneVariants } from '@/utils/postgrest'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,34 +12,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action } = body
 
-    // 1. CHECK PHONE NUMBER (Used on checkout to detect if customer exists)
-    if (action === 'check-phone') {
-      const { phone } = body
-      if (!phone) {
-        return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
-      }
-
-      const cleanPhone = phone.trim().replace(/[^0-9+]/g, '')
-      const { data: existingCustomer } = await adminDb
-        .from('customers')
-        .select('id, full_name, email, phone')
-        .eq('phone', cleanPhone)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (existingCustomer) {
-        return NextResponse.json({
-          exists: true,
-          email: existingCustomer.email,
-          fullName: existingCustomer.full_name
-        })
-      }
-
-      return NextResponse.json({ exists: false })
-    }
-
-    // 2. SIGNUP ACTION
+    // 1. SIGNUP ACTION
     if (action === 'signup') {
       const { full_name, phone, email, password } = body
 
@@ -44,12 +20,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Full name, phone, email, and password are all required.' }, { status: 400 })
       }
 
-      if (password.length < 6) {
+      if (typeof password !== 'string' || password.length < 6) {
         return NextResponse.json({ error: 'Password must be at least 6 characters long.' }, { status: 400 })
       }
 
-      const cleanEmail = email.toLowerCase().trim()
-      const cleanPhone = phone.trim().replace(/[^0-9+]/g, '')
+      const cleanEmail = String(email).toLowerCase().trim()
+      const cleanPhone = cleanPhoneNumber(phone)
+
+      if (!/^[^\s@,()"]+@[^\s@,()"]+\.[^\s@,()"]+$/.test(cleanEmail)) {
+        return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 })
+      }
+
+      if (cleanPhone.replace(/\D/g, '').length < 11) {
+        return NextResponse.json({ error: 'Please provide a valid mobile number.' }, { status: 400 })
+      }
+
+      // Staff addresses can't be registered as customer accounts
+      if (await isStaffEmail(cleanEmail)) {
+        return NextResponse.json({ error: 'An account with this email already exists. Please log in.' }, { status: 400 })
+      }
 
       // Check if phone is already registered
       const { data: phoneCheck } = await adminDb
@@ -115,20 +104,19 @@ export async function POST(request: NextRequest) {
         console.error('Failed to create customer table record:', custErr)
       }
 
-      // Link newly created or past orders to this customer account
+      // Retroactively link unclaimed guest orders placed with this phone or email
+      // (this also covers the order the account is being created from).
+      // Orders already owned by another account are never re-assigned.
       const customerId = customerRecord?.id || userId
-      if (body.order_id) {
-        await adminDb
-          .from('orders')
-          .update({ customer_id: customerId })
-          .eq('id', body.order_id)
-      }
-
-      // Retroactively link any guest orders with matching phone or email
+      const linkFilters = [
+        `customer_email.ilike.${ilikeExact(cleanEmail)}`,
+        ...phoneVariants(cleanPhone).map((p) => `customer_phone.eq.${orValue(p)}`)
+      ]
       await adminDb
         .from('orders')
         .update({ customer_id: customerId, user_id: userId })
-        .or(`customer_phone.eq.${cleanPhone},customer_email.ilike.${cleanEmail}`)
+        .or(linkFilters.join(','))
+        .is('user_id', null)
 
       // Automatically sign in the new customer to generate session
       const userClient = await createClient()
@@ -153,7 +141,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. LOGIN ACTION (Supports logging in with Email OR Phone)
+    // 2. LOGIN ACTION (Supports logging in with Email OR Phone)
     if (action === 'login') {
       const { identifier, password } = body
 
@@ -161,22 +149,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Email or phone number and password are required.' }, { status: 400 })
       }
 
-      const cleanInput = identifier.trim()
+      const cleanInput = String(identifier).trim()
       let emailToAuth = cleanInput.toLowerCase()
 
       // If identifier doesn't have '@', it's a phone number -> look up associated email
       if (!cleanInput.includes('@')) {
-        const cleanPhone = cleanInput.replace(/[^0-9+]/g, '')
         const { data: matchedCustomer } = await adminDb
           .from('customers')
           .select('email')
-          .eq('phone', cleanPhone)
+          .in('phone', phoneVariants(cleanInput))
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
 
         if (!matchedCustomer || !matchedCustomer.email) {
-          return NextResponse.json({ error: 'No customer account found with this phone number.' }, { status: 404 })
+          return NextResponse.json({ error: 'Incorrect email/phone number or password. Please try again.' }, { status: 401 })
         }
 
         emailToAuth = matchedCustomer.email.toLowerCase().trim()
@@ -199,17 +186,21 @@ export async function POST(request: NextRequest) {
       const { data: customerRecord } = await adminDb
         .from('customers')
         .select('*')
-        .or(`user_id.eq.${signInData.user.id},email.ilike.${emailToAuth}`)
+        .or(`user_id.eq.${signInData.user.id},email.ilike.${ilikeExact(emailToAuth)}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (customerRecord) {
         // Retroactively link any unlinked orders with matching email or phone
+        const linkFilters = [
+          `customer_email.ilike.${ilikeExact(emailToAuth)}`,
+          ...phoneVariants(customerRecord.phone || '').map((p) => `customer_phone.eq.${orValue(p)}`)
+        ]
         await adminDb
           .from('orders')
           .update({ customer_id: customerRecord.id, user_id: signInData.user.id })
-          .or(`customer_phone.eq.${customerRecord.phone},customer_email.ilike.${emailToAuth}`)
+          .or(linkFilters.join(','))
           .is('user_id', null)
       }
 
@@ -220,24 +211,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 4. FORGOT PASSWORD ACTION
+    // 3. FORGOT PASSWORD ACTION
     if (action === 'forgot-password') {
       const { email } = body
       if (!email || !email.includes('@')) {
         return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 })
       }
 
-      const cleanEmail = email.toLowerCase().trim()
-      const userClient = await createClient()
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-      const { error: resetErr } = await userClient.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${APP_URL}/account?tab=password`
-      })
-
-      if (resetErr) {
-        console.error('Password reset request error:', resetErr)
-      }
+      // Works for customer and staff accounts; the link lands on /reset-password
+      await requestPasswordReset(email)
 
       // Always return success for security (avoid enumeration)
       return NextResponse.json({
@@ -250,6 +232,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Customer auth API error:', error)
-    return NextResponse.json({ error: error.message || 'Authentication processing error' }, { status: 500 })
+    return NextResponse.json({ error: 'Authentication processing error' }, { status: 500 })
   }
 }

@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useLanguage } from '@/context/LanguageContext'
+import { useStore } from '@/context/StoreContext'
 import { StoreSettings } from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
 import { THEME_PALETTES } from '@/utils/theme'
 import { formatGoogleMapsEmbedUrl } from '@/utils/map'
+import { describeDeliveryCharges } from '@/utils/delivery'
 import ImageUploader from '@/components/ImageUploader'
 import AdminSidebar from '@/components/AdminSidebar'
 import {
@@ -27,6 +29,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
   const router = useRouter()
   const supabase = createClient()
   const { t, isBangla } = useLanguage()
+  const { updateClientSettings } = useStore()
 
   const [settings, setSettings] = useState<StoreSettings>(initialSettings)
   const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'emails' | 'tracking' | 'about'>('branding')
@@ -104,6 +107,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
       if (response.data?.success) {
         setSettings(response.data.data)
+        updateClientSettings(response.data.data)
+        if (response.data.warning) setErrorMsg(response.data.warning)
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 3000)
         router.refresh()
@@ -281,6 +286,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </label>
                     <p className="text-[11px] text-slate-500">Visible in navbar, mobile drawer, and printable invoices.</p>
                     <ImageUploader
+                      folder="branding"
                       value={settings.logo_url ? [settings.logo_url] : []}
                       maxImages={1}
                       single={true}
@@ -295,6 +301,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </label>
                     <p className="text-[11px] text-slate-500">Square image (PNG / ICO / JPG) used as browser tab icon.</p>
                     <ImageUploader
+                      folder="branding"
                       value={settings.favicon_url ? [settings.favicon_url] : []}
                       maxImages={1}
                       single={true}
@@ -337,6 +344,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       Upload a dedicated watermark image. If left empty, your Site Logo will be used as the watermark.
                     </p>
                     <ImageUploader
+                      folder="branding"
                       value={settings.watermark_image_url ? [settings.watermark_image_url] : []}
                       maxImages={1}
                       single={true}
@@ -345,6 +353,27 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     />
                   </div>
                 )}
+
+                {/* Image right-click / save protection */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Protect Store Images</span>
+                    <span className="text-[11px] text-slate-500 block mt-0.5">
+                      Disables right-click, long-press "Save image" and drag-to-save on storefront images. This deters casual copying; the watermark is what protects images that get copied anyway.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.protect_images}
+                    onClick={() => setSettings({ ...settings, protect_images: !settings.protect_images })}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.protect_images ? 'bg-brand-600' : 'bg-slate-300'}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.protect_images ? 'translate-x-5' : 'translate-x-0'}`}
+                    />
+                  </button>
+                </div>
 
                 {/* 8 Curated Theme Color Palettes */}
                 <div className="pt-6 border-t border-slate-100 space-y-3">
@@ -451,6 +480,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </label>
                     <p className="text-[11px] text-slate-500 mb-2">High-resolution banner background image (auto-compressed on upload).</p>
                     <ImageUploader
+                      folder="branding"
                       value={settings.hero_image_url ? [settings.hero_image_url] : []}
                       maxImages={1}
                       single={true}
@@ -479,6 +509,30 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       />
                       <span className="text-sm font-black text-brand-600 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-200 min-w-[50px] text-center">
                         {settings.hero_overlay_opacity ?? 35}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Showcase Slider Overlay Opacity */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Collection Slider Overlay Opacity
+                    </label>
+                    <p className="text-[11px] text-slate-500 mb-3">
+                      Darkness of the shading over Featured, Trending and Best Seller slider images. Set to 0% to remove the overlay completely.
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={settings.showcase_overlay_opacity ?? 60}
+                        onChange={(e) => setSettings({ ...settings, showcase_overlay_opacity: Number(e.target.value) })}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
+                      />
+                      <span className="text-sm font-black text-brand-600 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-200 min-w-[50px] text-center">
+                        {settings.showcase_overlay_opacity ?? 60}%
                       </span>
                     </div>
                   </div>
@@ -537,6 +591,27 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   </div>
 
                   <div className="space-y-4">
+
+                    {/* HOME PAGE: ALL PRODUCTS GRID */}
+                    <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">Show "All Products" grid on home page</span>
+                        <span className="text-[11px] text-slate-500 block mt-0.5">
+                          When off, the home page only shows the collections above. Search results are still shown when a customer searches.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.show_all_products}
+                        onClick={() => setSettings({ ...settings, show_all_products: !settings.show_all_products })}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.show_all_products ? 'bg-brand-600' : 'bg-slate-300'}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.show_all_products ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
+                      </button>
+                    </div>
 
                     {/* COLLECTION 1: FEATURED */}
                     <div className={`rounded-xl border p-4 space-y-3 transition-all ${settings.show_featured ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
@@ -884,7 +959,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                               Require Advance Delivery Charge via bKash
                             </span>
                             <span className="text-[11px] text-slate-500 block mt-0.5 max-w-md">
-                              Customer must prepay the delivery charge (৳{settings.delivery_charge_inside_dhaka} / ৳{settings.delivery_charge_outside_dhaka}) upfront via bKash to confirm order. Product price is collected on delivery.
+                              Customer must prepay the delivery charge ({describeDeliveryCharges(settings)}) upfront via bKash to confirm order. Product price is collected on delivery.
                             </span>
                           </div>
 
@@ -1121,6 +1196,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                             Upload a screenshot of your personal bKash QR code from your bKash app. Customers can scan it to send money instantly.
                           </p>
                           <ImageUploader
+                            folder="branding"
                             value={settings.bkash_personal_qr_url ? [settings.bkash_personal_qr_url] : []}
                             onChange={(urls) => setSettings({ ...settings, bkash_personal_qr_url: Array.isArray(urls) ? urls[0] || '' : urls || '' })}
                             single={true}
@@ -1193,10 +1269,53 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       Flexible Shipping Zones & Base Delivery Charges
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Configure your shop's primary city and customized zone names. Checkout will automatically match the customer's city and calculate the correct fee.
+                      Charge one flat rate everywhere, or set separate rates for inside and outside your store's city.
                     </p>
                   </div>
 
+                  {/* Delivery pricing mode */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {([
+                      { mode: 'zone', title: 'By zone', desc: 'Different charge inside / outside your city' },
+                      { mode: 'flat', title: 'Flat rate nationwide', desc: 'Same charge anywhere in Bangladesh' }
+                    ] as const).map((opt) => (
+                      <label
+                        key={opt.mode}
+                        className={`flex items-start gap-2 p-3 rounded-lg border-2 cursor-pointer bg-white transition ${(settings.delivery_mode || 'zone') === opt.mode ? 'border-brand-600 ring-2 ring-brand-500/10' : 'border-slate-200 hover:border-slate-300'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="delivery_mode"
+                          checked={(settings.delivery_mode || 'zone') === opt.mode}
+                          onChange={() => setSettings({ ...settings, delivery_mode: opt.mode })}
+                          className="mt-0.5 text-brand-600"
+                        />
+                        <span>
+                          <span className="block text-xs font-bold text-slate-900">{opt.title}</span>
+                          <span className="block text-[11px] text-slate-500">{opt.desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {settings.delivery_mode === 'flat' ? (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Flat Delivery Fee (৳)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={settings.delivery_charge_flat ?? 0}
+                        onChange={(e) => setSettings({ ...settings, delivery_charge_flat: Number(e.target.value) })}
+                        className="w-full sm:w-48 rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-bold"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Shown to customers as "{describeDeliveryCharges(settings)}" on product pages and at checkout.
+                      </p>
+                    </div>
+                  ) : (
+                  <>
                   {/* Store Primary City */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -1204,7 +1323,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </label>
                     <input
                       type="text"
-                      value={settings.store_city_name || 'Dhaka'}
+                      value={settings.store_city_name ?? ''}
                       onChange={(e) => setSettings({ ...settings, store_city_name: e.target.value })}
                       placeholder="e.g. Dhaka, Chittagong, Sylhet, Khulna, Rajshahi"
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
@@ -1222,9 +1341,9 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         </label>
                         <input
                           type="text"
-                          value={settings.shipping_zone_1_label || 'Inside Dhaka'}
+                          value={settings.shipping_zone_1_label ?? ''}
                           onChange={(e) => setSettings({ ...settings, shipping_zone_1_label: e.target.value })}
-                          placeholder="e.g. Inside Dhaka"
+                          placeholder="e.g. Inside Khulna"
                           className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
                         />
                       </div>
@@ -1248,9 +1367,9 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         </label>
                         <input
                           type="text"
-                          value={settings.shipping_zone_2_label || 'Outside Dhaka'}
+                          value={settings.shipping_zone_2_label ?? ''}
                           onChange={(e) => setSettings({ ...settings, shipping_zone_2_label: e.target.value })}
-                          placeholder="e.g. Outside Dhaka"
+                          placeholder="e.g. Outside Khulna"
                           className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
                         />
                       </div>
@@ -1267,6 +1386,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
 
                 {/* 2. LOGISTICS PROVIDER TOGGLES & CREDENTIALS */}
@@ -1528,7 +1649,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         <span>Custom / Manual Shipping Mode</span>
                       </div>
                       <p className="text-blue-800 text-[11px] leading-relaxed">
-                        With both third-party couriers turned off, customers will simply pick Inside/Outside Dhaka and provide their address. You can dispatch orders manually through your preferred riders or local delivery partners.
+                        With both third-party couriers turned off, customers will simply pick inside/outside your store city and provide their address. You can dispatch orders manually through your preferred riders or local delivery partners.
                       </p>
                     </div>
                   )}

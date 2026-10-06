@@ -29,7 +29,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
   
   const [unreadCount, setUnreadCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [currentRole, setCurrentRole] = useState<'admin' | 'shop_owner' | 'staff'>('shop_owner')
+  const [currentRole, setCurrentRole] = useState<'admin' | 'shop_owner' | 'staff'>('staff')
   const [userDisplayName, setUserDisplayName] = useState('')
   const [userEmail, setUserEmail] = useState('')
 
@@ -37,33 +37,12 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
   useEffect(() => {
     async function loadUserRole() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user && user.email) {
-          setUserEmail(user.email)
-          const cleanEmail = user.email.toLowerCase().trim()
-          const metaRole = normalizeStaffRole(user.user_metadata?.role)
-          
-          const { data: staffMembers } = await supabase
-            .from('staff_members')
-            .select('*')
-            .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
-            .limit(1)
-
-          const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
-
-          if (staffMember) {
-            setCurrentRole(normalizeStaffRole(staffMember.role || metaRole))
-            setUserDisplayName(staffMember.full_name || user.email.split('@')[0])
-          } else {
-            // Default founder / metadata check
-            setUserDisplayName(user.user_metadata?.full_name || user.email.split('@')[0])
-            if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail === 'admin@example.com' || cleanEmail.includes('admin') || metaRole === 'shop_owner' || metaRole === 'admin') {
-              setCurrentRole(metaRole === 'admin' ? 'admin' : 'shop_owner')
-            } else {
-              setCurrentRole('staff')
-            }
-          }
-        }
+        const res = await fetch('/api/admin/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const me = await res.json()
+        setUserEmail(me.email || '')
+        setUserDisplayName(me.full_name || '')
+        setCurrentRole(normalizeStaffRole(me.role))
       } catch (err) {
         // silent
       }

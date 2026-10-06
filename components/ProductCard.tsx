@@ -6,6 +6,7 @@ import { ShoppingBag, Eye, X, Check, ArrowRight, Heart } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useCustomer } from '@/context/CustomerContext'
 import { useLanguage } from '@/context/LanguageContext'
+import { resolveVariantSelection } from '@/utils/variations'
 
 export interface VariationValue {
   label: string
@@ -178,13 +179,14 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
   const handleConfirmVariantAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    const variant = resolveVariantSelection(product, selectedVariations)
 
     addToCart({
       id: product.id,
       name: product.name,
       slug: product.slug,
-      price: Number(product.price),
-      image: product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5',
+      price: variant.price,
+      image: variant.image || product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5',
       selectedVariations
     }, 1)
 

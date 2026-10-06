@@ -1,28 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStoreSettings } from '@/utils/settings'
 import { sendDailyPendingOrdersSummary } from '@/utils/email'
+import { verifyStaffAuth } from '@/utils/auth'
+import { isAuthorizedCronRequest } from '@/utils/cron'
 
 export const dynamic = 'force-dynamic'
 
 // GET: Handled by Vercel Cron or external scheduler
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const isForce = searchParams.get('force') === 'true'
-    const targetEmail = searchParams.get('email') || undefined
+    // Scheduled runs only; the digest always goes to the configured store email
+    if (!isAuthorizedCronRequest(request)) {
+      return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
+    }
 
     const settings = await getStoreSettings(true)
 
-    // Check authorization header if CRON_SECRET is configured
-    const authHeader = request.headers.get('authorization')
-    if (process.env.CRON_SECRET && !isForce) {
-      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
-      }
-    }
-
-    // If not forced, check if daily digest is enabled in settings
-    if (!isForce && !settings.daily_digest_enabled) {
+    if (!settings.daily_digest_enabled) {
       return NextResponse.json({
         success: true,
         skipped: true,
@@ -30,8 +24,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // If not forced, check if current Bangladesh Time hour matches scheduled hour
-    if (!isForce) {
+    // Only send when the current Bangladesh Time hour matches the scheduled hour
+    {
       const scheduledTime = settings.daily_digest_time || '20:00'
       const [scheduledHour] = scheduledTime.split(':').map(Number)
 
@@ -53,17 +47,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const result = await sendDailyPendingOrdersSummary(targetEmail)
+    const result = await sendDailyPendingOrdersSummary()
     return NextResponse.json({ success: true, result })
   } catch (error: any) {
     console.error('Daily digest cron execution error:', error)
-    return NextResponse.json({ error: error.message || 'Daily digest cron failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Daily digest cron failed' }, { status: 500 })
   }
 }
 
 // POST: Triggered by Admin "Send Test Summary Now" button
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const body = await request.json().catch(() => ({}))
     const { email } = body
 
@@ -75,6 +74,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result })
   } catch (error: any) {
     console.error('Daily digest test execution error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to send summary' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to send summary' }, { status: 500 })
   }
 }

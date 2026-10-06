@@ -60,6 +60,9 @@ export interface StoreSettings {
   shipping_zone_2_label: string
   delivery_charge_inside_dhaka: number
   delivery_charge_outside_dhaka: number
+  // 'zone' = inside/outside store city rates, 'flat' = one rate nationwide
+  delivery_mode: 'zone' | 'flat'
+  delivery_charge_flat: number
   // About & Contact Details
   about_enabled: boolean
   about_story: string
@@ -90,6 +93,12 @@ export interface StoreSettings {
   invoice_print_colorful: boolean
   // Hero Overlay Opacity (0-100)
   hero_overlay_opacity: number
+  // Featured / Trending / Best Seller slider overlay opacity (0-100)
+  showcase_overlay_opacity: number
+  // Show the "All Products" grid at the bottom of the home page
+  show_all_products: boolean
+  // Block right-click / long-press saving and dragging of storefront images
+  protect_images: boolean
   // Custom Watermark Image
   watermark_image_url: string
   // About Page Value Pillars
@@ -158,6 +167,11 @@ export interface PublicStoreSettings {
   custom_head_scripts: string
   invoice_print_colorful: boolean
   hero_overlay_opacity: number
+  showcase_overlay_opacity: number
+  show_all_products: boolean
+  protect_images: boolean
+  delivery_mode: 'zone' | 'flat'
+  delivery_charge_flat: number
   watermark_image_url: string
   about_quality_title: string
   about_quality_desc: string
@@ -216,12 +230,14 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   steadfast_api_key: process.env.STEADFAST_API_KEY || '',
   steadfast_secret_key: process.env.STEADFAST_SECRET_KEY || '',
   steadfast_base_url: process.env.STEADFAST_BASE_URL || 'https://portal.steadfast.com.bd/api/v1',
-  store_city_name: 'Dhaka',
+  store_city_name: 'Khulna',
   store_city_id: 1,
-  shipping_zone_1_label: 'Inside Dhaka',
-  shipping_zone_2_label: 'Outside Dhaka',
-  delivery_charge_inside_dhaka: 60,
-  delivery_charge_outside_dhaka: 120,
+  shipping_zone_1_label: 'Inside Khulna',
+  shipping_zone_2_label: 'Outside Khulna',
+  delivery_charge_inside_dhaka: 80,
+  delivery_charge_outside_dhaka: 130,
+  delivery_mode: 'zone',
+  delivery_charge_flat: 100,
   about_enabled: true,
   about_story: '',
   contact_phone: '',
@@ -247,6 +263,9 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   custom_head_scripts: '',
   invoice_print_colorful: false,
   hero_overlay_opacity: 35,
+  showcase_overlay_opacity: 60,
+  show_all_products: false,
+  protect_images: true,
   watermark_image_url: '',
   about_quality_title: '',
   about_quality_desc: '',
@@ -311,6 +330,8 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       shipping_zone_2_label: data.shipping_zone_2_label || DEFAULT_SETTINGS.shipping_zone_2_label,
       delivery_charge_inside_dhaka: Number(data.delivery_charge_inside_dhaka ?? DEFAULT_SETTINGS.delivery_charge_inside_dhaka),
       delivery_charge_outside_dhaka: Number(data.delivery_charge_outside_dhaka ?? DEFAULT_SETTINGS.delivery_charge_outside_dhaka),
+      delivery_mode: data.delivery_mode === 'flat' ? 'flat' : 'zone',
+      delivery_charge_flat: Number(data.delivery_charge_flat ?? DEFAULT_SETTINGS.delivery_charge_flat),
       about_enabled: data.about_enabled !== undefined ? Boolean(data.about_enabled) : DEFAULT_SETTINGS.about_enabled,
       about_story: data.about_story ?? '',
       contact_phone: data.contact_phone ?? '',
@@ -335,7 +356,10 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       tiktok_events_api_token: data.tiktok_events_api_token ?? '',
       custom_head_scripts: data.custom_head_scripts ?? '',
       invoice_print_colorful: data.invoice_print_colorful !== undefined ? Boolean(data.invoice_print_colorful) : DEFAULT_SETTINGS.invoice_print_colorful,
-      hero_overlay_opacity: data.hero_overlay_opacity !== undefined ? Number(data.hero_overlay_opacity) : DEFAULT_SETTINGS.hero_overlay_opacity,
+      hero_overlay_opacity: data.hero_overlay_opacity != null ? Number(data.hero_overlay_opacity) : DEFAULT_SETTINGS.hero_overlay_opacity,
+      showcase_overlay_opacity: data.showcase_overlay_opacity != null ? Number(data.showcase_overlay_opacity) : DEFAULT_SETTINGS.showcase_overlay_opacity,
+      show_all_products: data.show_all_products != null ? Boolean(data.show_all_products) : DEFAULT_SETTINGS.show_all_products,
+      protect_images: data.protect_images != null ? Boolean(data.protect_images) : DEFAULT_SETTINGS.protect_images,
       watermark_image_url: data.watermark_image_url ?? '',
       about_quality_title: data.about_quality_title ?? '',
       about_quality_desc: data.about_quality_desc ?? '',
@@ -388,6 +412,8 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     shipping_zone_2_label: full.shipping_zone_2_label,
     delivery_charge_inside_dhaka: full.delivery_charge_inside_dhaka,
     delivery_charge_outside_dhaka: full.delivery_charge_outside_dhaka,
+    delivery_mode: full.delivery_mode,
+    delivery_charge_flat: full.delivery_charge_flat,
     about_enabled: full.about_enabled,
     about_story: full.about_story,
     contact_phone: full.contact_phone,
@@ -410,6 +436,9 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     custom_head_scripts: full.custom_head_scripts,
     invoice_print_colorful: full.invoice_print_colorful,
     hero_overlay_opacity: full.hero_overlay_opacity,
+    showcase_overlay_opacity: full.showcase_overlay_opacity,
+    show_all_products: full.show_all_products,
+    protect_images: full.protect_images,
     watermark_image_url: full.watermark_image_url,
     about_quality_title: full.about_quality_title,
     about_quality_desc: full.about_quality_desc,
@@ -423,6 +452,41 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     auto_best_seller: full.auto_best_seller,
     auto_trending: full.auto_trending
   }
+}
+
+// Credentials that must never be sent to a browser in full
+export const SECRET_SETTING_KEYS = [
+  'bkash_app_key',
+  'bkash_app_secret',
+  'bkash_username',
+  'bkash_password',
+  'pathao_client_id',
+  'pathao_client_secret',
+  'pathao_username',
+  'pathao_password',
+  'steadfast_api_key',
+  'steadfast_secret_key',
+  'resend_api_key',
+  'meta_conversions_api_token',
+  'tiktok_events_api_token'
+] as const
+
+const SECRET_MASK_PREFIX = '••••••••'
+
+export function isMaskedSecret(value: unknown): boolean {
+  return typeof value === 'string' && value.startsWith(SECRET_MASK_PREFIX)
+}
+
+/** Replace secret values with a mask showing only the last 4 characters */
+export function maskSecretSettings<T extends Record<string, any>>(settings: T): T {
+  const masked: Record<string, any> = { ...settings }
+  for (const key of SECRET_SETTING_KEYS) {
+    const value = masked[key]
+    if (typeof value === 'string' && value.length > 0) {
+      masked[key] = SECRET_MASK_PREFIX + (value.length > 8 ? value.slice(-4) : '')
+    }
+  }
+  return masked as T
 }
 
 export function invalidateSettingsCache() {

@@ -1,3 +1,5 @@
+-- NOTE: The RLS policies in this file are superseded. Always run
+-- supabase_migrate_v7_security.sql after this file to re-apply the secure policies.
 -- ==========================================
 -- SUPABASE MIGRATION SCRIPT (PHASE 2 UPDATE)
 -- Run this in Supabase SQL Editor to upgrade an existing DB

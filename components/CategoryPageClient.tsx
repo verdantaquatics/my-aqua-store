@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import ProductCard from '@/components/ProductCard'
 import { useStore } from '@/context/StoreContext'
+import { getDescendantIds } from '@/utils/categories'
 
 interface Product {
   id: string
@@ -60,7 +61,7 @@ export default function CategoryPageClient({ category, allCategories, initialPro
     if (product.is_hidden) return false
 
     const productCatIds: string[] = Array.isArray(product.variations?.category_ids)
-      ? product.variations.category_ids
+      ? [...product.variations.category_ids]
       : product.category_id ? [product.category_id] : []
       
     if (product.is_featured && !productCatIds.includes('c0000000-0000-0000-0000-000000000008')) {
@@ -69,12 +70,9 @@ export default function CategoryPageClient({ category, allCategories, initialPro
 
     // Determine target category IDs
     let targetCategoryIds: string[] = []
-    if (activeSubcategoryId !== 'all') {
-      targetCategoryIds = [activeSubcategoryId]
-    } else {
-      // Include this category + all its subcategories
-      targetCategoryIds = [category.id, ...subcategories.map((s) => s.id)]
-    }
+    // Include the selected category and every level below it
+    const rootId = activeSubcategoryId !== 'all' ? activeSubcategoryId : category.id
+    targetCategoryIds = [rootId, ...getDescendantIds(rootId, categories)]
 
     const matchesCategory = targetCategoryIds.some((id) => productCatIds.includes(id))
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

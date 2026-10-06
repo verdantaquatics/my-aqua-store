@@ -11,6 +11,7 @@ import PromoRibbon from '@/components/PromoRibbon'
 import PromoBanner from '@/components/PromoBanner'
 import AuthModal from '@/components/AuthModal'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
+import ImageProtection from '@/components/ImageProtection'
 import { getPublicSettings } from '@/utils/settings'
 import { createAdminClient } from '@/utils/supabase/server'
 
@@ -86,10 +87,13 @@ export default async function RootLayout({
             <StoreProvider initialSettings={settings} initialCategories={categories}>
               <CustomerProvider>
                 <CartProvider>
-                  <PromoRibbon ribbon={activeRibbon} />
-                  <PromoBanner banner={activeBanner} />
+                  <div className="print:hidden">
+                    <PromoRibbon ribbon={activeRibbon} />
+                    <PromoBanner banner={activeBanner} />
+                  </div>
                   <AuthModal />
                   <FloatingActionButtons />
+                  <ImageProtection />
                   {children}
                 </CartProvider>
               </CustomerProvider>

@@ -15,17 +15,19 @@ function extractCleanPixelId(input?: string): string {
   if (matchInit && matchInit[1]) return matchInit[1]
   const matchTr = trimmed.match(/[?&]id=(\d+)/i)
   if (matchTr && matchTr[1]) return matchTr[1]
-  return trimmed.replace(/[^0-9]/g, '') || trimmed
+  return trimmed.replace(/[^0-9]/g, '')
+}
+
+// IDs are written into inline <script> code, so keep only the characters real IDs use
+function safeTrackingId(input?: string): string {
+  return (input || '').trim().replace(/[^A-Za-z0-9-]/g, '')
 }
 
 export default function TrackingScripts({ settings }: TrackingScriptsProps) {
-  const { 
-    meta_pixel_id, 
-    google_analytics_id, 
-    google_tag_manager_id, 
-    tiktok_pixel_id, 
-    custom_head_scripts 
-  } = settings
+  const { meta_pixel_id, custom_head_scripts } = settings
+  const google_analytics_id = safeTrackingId(settings.google_analytics_id)
+  const google_tag_manager_id = safeTrackingId(settings.google_tag_manager_id)
+  const tiktok_pixel_id = safeTrackingId(settings.tiktok_pixel_id)
 
   const cleanMetaPixelId = extractCleanPixelId(meta_pixel_id)
 

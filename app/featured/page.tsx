@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/utils/supabase/server'
+import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
 import { getPublicSettings } from '@/utils/settings'
 import { notFound } from 'next/navigation'
 import CollectionPageClient from '@/components/CollectionPageClient'
@@ -22,7 +23,7 @@ export default async function FeaturedCollectionPage() {
   // Fetch Featured Products
   const { data: products } = await supabase
     .from('products')
-    .select('*')
+    .select(PUBLIC_PRODUCT_COLUMNS)
     .eq('is_featured', true)
     .eq('is_hidden', false)
     .order('created_at', { ascending: false })

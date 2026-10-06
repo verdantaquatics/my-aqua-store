@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { sendInvoiceEmail } from '@/utils/email'
+import { verifyStaffAuth } from '@/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
+// POST: (Re)send an order invoice email - dashboard only
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
     const { order_id } = body
@@ -53,6 +60,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result })
   } catch (error: any) {
     console.error('Invoice email route error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to send invoice email' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to send invoice email' }, { status: 500 })
   }
 }

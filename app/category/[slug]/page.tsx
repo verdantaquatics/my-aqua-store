@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { PUBLIC_PRODUCT_COLUMNS } from '@/utils/product-columns'
 import { notFound } from 'next/navigation'
 import CategoryPageClient from '@/components/CategoryPageClient'
 
@@ -32,7 +33,7 @@ export default async function CategoryPage({ params }: PageProps) {
   // Fetch all products with their associated categories
   const { data: products } = await supabase
     .from('products')
-    .select('*, categories(name, slug)')
+    .select(`${PUBLIC_PRODUCT_COLUMNS}, categories(name, slug)`)
     .order('created_at', { ascending: false })
 
   return (

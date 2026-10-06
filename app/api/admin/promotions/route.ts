@@ -7,6 +7,11 @@ export const dynamic = 'force-dynamic'
 // GET: Fetch all promotions
 export async function GET() {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('promotions')

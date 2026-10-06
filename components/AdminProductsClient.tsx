@@ -6,9 +6,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
-import ImageUploader from '@/components/ImageUploader'
+import ImageUploader, { compressImage, readUploadResponse } from '@/components/ImageUploader'
 import AdminSidebar from '@/components/AdminSidebar'
 import RichTextEditor from '@/components/RichTextEditor'
+import { getDescendantIds, getAncestorIds } from '@/utils/categories'
+import { parseProductVariations, VariationOption, VariationValue } from '@/utils/variations'
+
+export { parseProductVariations }
+export type { VariationOption, VariationValue }
 import { 
   BarChart3, ShoppingBag, Package, LogOut, Plus, Trash2, Edit2,
   X, Check, Sparkles, FolderTree, Settings, ShieldCheck, ChevronRight,
@@ -21,18 +26,6 @@ export interface Category {
   parent_id?: string | null
   name: string
   slug: string
-}
-
-export interface VariationValue {
-  label: string
-  stock: number
-  image_url: string
-  price?: number
-}
-
-export interface VariationOption {
-  name: string
-  values: VariationValue[]
 }
 
 export interface Product {
@@ -59,47 +52,6 @@ export interface Product {
 interface AdminProductsProps {
   initialProducts: Product[]
   initialCategories: Category[]
-}
-
-// Convert legacy flat variation format or rich format to standard VariationOption[]
-export function parseProductVariations(variations: any, fallbackStock = 0): VariationOption[] {
-  if (!variations || typeof variations !== 'object') return []
-
-  // Check if already in rich format
-  if (Array.isArray(variations.options)) {
-    return variations.options.map((opt: any) => ({
-      name: opt.name || 'Option',
-      values: Array.isArray(opt.values)
-        ? opt.values.map((v: any) => ({
-            label: v.label || String(v),
-            stock: typeof v.stock === 'number' ? v.stock : fallbackStock,
-            image_url: v.image_url || '',
-            price: v.price !== undefined && v.price !== null && v.price !== '' ? Number(v.price) : undefined
-          }))
-        : []
-    }))
-  }
-
-  // Legacy flat format e.g. {"sizes": ["1.5 Feet", "2 Feet"]}
-  const options: VariationOption[] = []
-  Object.entries(variations).forEach(([key, values]) => {
-    if (key === 'category_ids') return
-    if (Array.isArray(values) && values.length > 0) {
-      const cleanName = key.charAt(0).toUpperCase() + key.slice(1).replace(/s$/, '')
-      const stockPerVal = Math.max(1, Math.floor(fallbackStock / values.length))
-      options.push({
-        name: cleanName,
-        values: values.map((v: any) => ({
-          label: String(v),
-          stock: stockPerVal,
-          image_url: '',
-          price: undefined
-        }))
-      })
-    }
-  })
-
-  return options
 }
 
 export default function AdminProductsClient({ initialProducts, initialCategories }: AdminProductsProps) {
@@ -225,6 +177,16 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     return Number(defaultStockStr) || 0
   }
 
+  // Groups/values left half-filled used to be dropped silently on save
+  const validateVariations = (options: VariationOption[]): string | null => {
+    for (const opt of options) {
+      const hasValues = opt.values.some((v) => v.label.trim())
+      if (!opt.name.trim() && hasValues) return 'Please give every variation group a name (e.g. Size, Color).'
+      if (opt.name.trim() && !hasValues) return `Please add at least one value for the "${opt.name}" variation, or remove the group.`
+    }
+    return null
+  }
+
   // Handle Category selection with Auto-select rule
   const toggleCategory = (catId: string, currentSelected: string[], setSelected: (ids: string[]) => void) => {
     const targetCat = categories.find((c) => c.id === catId)
@@ -233,16 +195,13 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     const isAlreadySelected = currentSelected.includes(catId)
 
     if (isAlreadySelected) {
-      // Uncheck this category and all its children
-      const childIds = categories.filter((c) => c.parent_id === catId).map((c) => c.id)
-      setSelected(currentSelected.filter((id) => id !== catId && !childIds.includes(id)))
+      // Uncheck this category and every category below it
+      const descendantIds = getDescendantIds(catId, categories)
+      setSelected(currentSelected.filter((id) => id !== catId && !descendantIds.includes(id)))
     } else {
-      // Check this category and auto-check its parent if this is a child
-      const newSelected = [...currentSelected, catId]
-      if (targetCat.parent_id && !newSelected.includes(targetCat.parent_id)) {
-        newSelected.push(targetCat.parent_id)
-      }
-      setSelected(newSelected)
+      // Check this category and auto-check all of its ancestors
+      const ancestorIds = getAncestorIds(catId, categories)
+      setSelected(Array.from(new Set([...currentSelected, catId, ...ancestorIds])))
     }
   }
 
@@ -286,6 +245,13 @@ export default function AdminProductsClient({ initialProducts, initialCategories
 
     if (images.length === 0) {
       alert('Please upload at least one product photo.')
+      setLoading(false)
+      return
+    }
+
+    const variationError = validateVariations(variationOptions)
+    if (variationError) {
+      alert(variationError)
       setLoading(false)
       return
     }
@@ -385,6 +351,13 @@ export default function AdminProductsClient({ initialProducts, initialCategories
       return
     }
 
+    const variationError = validateVariations(editVariationOptions)
+    if (variationError) {
+      alert(variationError)
+      setLoading(false)
+      return
+    }
+
     const primaryCategoryId = editCategoryIds[0]
     const finalStock = computeTotalStock(editVariationOptions, editStock)
 
@@ -464,37 +437,104 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     }
   }
 
-  // Group categories into parent & child tree
-  const parentCategories = categories.filter((c) => !c.parent_id)
-  const getSubcategories = (parentId: string) => categories.filter((c) => c.parent_id === parentId)
+  // Recursive category checklist (supports any depth, e.g. Accessories > Filters & Pumps > Bio Media)
+  const renderCategoryTree = (
+    parentId: string | null,
+    selected: string[],
+    setSelected: (ids: string[]) => void,
+    depth = 0
+  ): React.ReactNode => {
+    const level = categories.filter((c) => (c.parent_id || null) === parentId)
+    if (level.length === 0) return null
+
+    return (
+      <div className={depth > 0 ? 'pl-6 space-y-1 border-l-2 border-slate-200 ml-2' : 'space-y-2'}>
+        {level.map((cat) => (
+          <div key={cat.id} className="space-y-1">
+            <label
+              className={`flex items-center gap-2 text-xs cursor-pointer ${depth === 0 ? 'font-bold text-slate-900' : 'font-medium text-slate-700 hover:text-brand-600'}`}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(cat.id)}
+                onChange={() => toggleCategory(cat.id, selected, setSelected)}
+                className="text-brand-600 rounded"
+              />
+              <span>{cat.name}</span>
+            </label>
+            {renderCategoryTree(cat.id, selected, setSelected, depth + 1)}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   // Variation builder helpers
   const renderVariationBuilder = (
     options: VariationOption[],
     setOptions: React.Dispatch<React.SetStateAction<VariationOption[]>>
   ) => {
+    // All updates are immutable + functional so async photo uploads never write into stale state
     const addOptionGroup = () => {
-      setOptions([...options, { name: '', values: [{ label: '', stock: 5, image_url: '' }] }])
+      setOptions((prev) => [...prev, { name: '', values: [{ label: '', stock: 5, image_url: '' }] }])
     }
 
     const removeOptionGroup = (optIdx: number) => {
-      setOptions(options.filter((_, idx) => idx !== optIdx))
+      setOptions((prev) => prev.filter((_, idx) => idx !== optIdx))
+    }
+
+    const renameOption = (optIdx: number, name: string) => {
+      setOptions((prev) => prev.map((o, i) => (i === optIdx ? { ...o, name } : o)))
     }
 
     const addValueRow = (optIdx: number) => {
-      const updated = [...options]
-      updated[optIdx].values.push({ label: '', stock: 5, image_url: '' })
-      setOptions(updated)
+      setOptions((prev) => prev.map((o, i) => (
+        i === optIdx ? { ...o, values: [...o.values, { label: '', stock: 5, image_url: '' }] } : o
+      )))
     }
 
     const removeValueRow = (optIdx: number, valIdx: number) => {
-      const updated = [...options]
-      updated[optIdx].values = updated[optIdx].values.filter((_, idx) => idx !== valIdx)
-      setOptions(updated)
+      setOptions((prev) => prev.map((o, i) => (
+        i === optIdx ? { ...o, values: o.values.filter((_, idx) => idx !== valIdx) } : o
+      )))
+    }
+
+    const patchValue = (optIdx: number, valIdx: number, patch: Partial<VariationValue>) => {
+      setOptions((prev) => prev.map((o, i) => (
+        i !== optIdx ? o : { ...o, values: o.values.map((v, j) => (j === valIdx ? { ...v, ...patch } : v)) }
+      )))
+    }
+
+    const uploadVariantPhoto = async (optIdx: number, valIdx: number, original: File) => {
+      setUploadingVariantKey(`${optIdx}-${valIdx}`)
+      try {
+        const wmUrl = settings?.watermark_image_url || settings?.logo_url
+        const file = await compressImage(original, wmUrl, settings?.watermark_enabled)
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('folder', 'variations')
+        const res = await fetch('/api/upload', { method: 'POST', body: formData })
+        const data = await readUploadResponse(res)
+        if (!res.ok || !data.url) {
+          alert(data.error || 'Image upload failed. Please try a smaller file or different format.')
+          return
+        }
+        patchValue(optIdx, valIdx, { image_url: data.url })
+      } catch (err: any) {
+        alert(`Upload error: ${err.message || 'Network error'}`)
+      } finally {
+        setUploadingVariantKey(null)
+      }
     }
 
     return (
-      <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+      <div
+        className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/70 p-4"
+        onKeyDown={(e) => {
+          // Enter inside the builder must not submit the whole product form
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault()
+        }}
+      >
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
@@ -527,11 +567,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                       type="text"
                       placeholder="e.g. Size, Color, Capacity"
                       value={opt.name}
-                      onChange={(e) => {
-                        const updated = [...options]
-                        updated[optIdx].name = e.target.value
-                        setOptions(updated)
-                      }}
+                      onChange={(e) => renameOption(optIdx, e.target.value)}
                       className="rounded border border-slate-200 px-2.5 py-1 text-xs outline-none focus:border-brand-500 font-medium w-48"
                     />
                   </div>
@@ -560,11 +596,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                         type="text"
                         placeholder="e.g. 2 Feet, Black"
                         value={val.label}
-                        onChange={(e) => {
-                          const updated = [...options]
-                          updated[optIdx].values[valIdx].label = e.target.value
-                          setOptions(updated)
-                        }}
+                        onChange={(e) => patchValue(optIdx, valIdx, { label: e.target.value })}
                         className="col-span-4 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
                       />
                       <input
@@ -572,11 +604,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                         min="0"
                         placeholder="0"
                         value={val.stock}
-                        onChange={(e) => {
-                          const updated = [...options]
-                          updated[optIdx].values[valIdx].stock = Number(e.target.value)
-                          setOptions(updated)
-                        }}
+                        onChange={(e) => patchValue(optIdx, valIdx, { stock: Math.max(0, Number(e.target.value) || 0) })}
                         className="col-span-2 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500 text-center"
                       />
                       <input
@@ -584,12 +612,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                         min="0"
                         placeholder="Default"
                         value={val.price !== undefined ? val.price : ''}
-                        onChange={(e) => {
-                          const updated = [...options]
-                          const valNum = e.target.value === '' ? undefined : Number(e.target.value)
-                          updated[optIdx].values[valIdx].price = valNum
-                          setOptions(updated)
-                        }}
+                        onChange={(e) => patchValue(optIdx, valIdx, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
                         className="col-span-3 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500 text-center placeholder:text-slate-300"
                         title="Optional custom price for this variant (leave blank to use base price)"
                       />
@@ -600,11 +623,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                             <img src={val.image_url} alt="" className="h-6 w-6 rounded object-cover border border-slate-200" />
                             <button
                               type="button"
-                              onClick={() => {
-                                const updated = [...options]
-                                updated[optIdx].values[valIdx].image_url = ''
-                                setOptions(updated)
-                              }}
+                              onClick={() => patchValue(optIdx, valIdx, { image_url: '' })}
                               className="text-[10px] text-red-500 hover:underline"
                             >
                               Clear
@@ -623,30 +642,10 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={async (e) => {
+                              onChange={(e) => {
                                 const file = e.target.files?.[0]
-                                if (!file) return
-                                const key = `${optIdx}-${valIdx}`
-                                setUploadingVariantKey(key)
-                                try {
-                                  const formData = new FormData()
-                                  formData.append('file', file)
-                                  formData.append('folder', 'variations')
-                                  const res = await fetch('/api/upload', { method: 'POST', body: formData })
-                                  const data = await res.json()
-                                  if (!res.ok || !data.url) {
-                                    alert(data.error || 'Image upload failed. Please try a smaller file or different format.')
-                                    return
-                                  }
-                                  const updated = [...options]
-                                  updated[optIdx].values[valIdx].image_url = data.url
-                                  setOptions(updated)
-                                } catch (err: any) {
-                                  alert(`Upload error: ${err.message || 'Network error'}`)
-                                } finally {
-                                  setUploadingVariantKey(null)
-                                  e.target.value = ''
-                                }
+                                e.target.value = ''
+                                if (file) uploadVariantPhoto(optIdx, valIdx, file)
                               }}
                             />
                           </label>
@@ -732,40 +731,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                         Categories (Select one or more) *
                       </label>
                       <div className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50 max-h-48 overflow-y-auto">
-                        {parentCategories.map((parent) => {
-                          const children = getSubcategories(parent.id)
-                          const isParentChecked = selectedCategoryIds.includes(parent.id)
-
-                          return (
-                            <div key={parent.id} className="space-y-1">
-                              <label className="flex items-center gap-2 text-xs font-bold text-slate-900 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={isParentChecked}
-                                  onChange={() => toggleCategory(parent.id, selectedCategoryIds, setSelectedCategoryIds)}
-                                  className="text-brand-600 rounded"
-                                />
-                                <span>{parent.name}</span>
-                              </label>
-
-                              {children.length > 0 && (
-                                <div className="pl-6 space-y-1 border-l-2 border-slate-200 ml-2">
-                                  {children.map((child) => (
-                                    <label key={child.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-medium hover:text-brand-600">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedCategoryIds.includes(child.id)}
-                                        onChange={() => toggleCategory(child.id, selectedCategoryIds, setSelectedCategoryIds)}
-                                        className="text-brand-600 rounded"
-                                      />
-                                      <span>{child.name}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
+                        {renderCategoryTree(null, selectedCategoryIds, setSelectedCategoryIds)}
                       </div>
                     </div>
 
@@ -988,40 +954,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-slate-700 uppercase">Categories *</label>
                       <div className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50 max-h-48 overflow-y-auto">
-                        {parentCategories.map((parent) => {
-                          const children = getSubcategories(parent.id)
-                          const isParentChecked = editCategoryIds.includes(parent.id)
-
-                          return (
-                            <div key={parent.id} className="space-y-1">
-                              <label className="flex items-center gap-2 text-xs font-bold text-slate-900 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={isParentChecked}
-                                  onChange={() => toggleCategory(parent.id, editCategoryIds, setEditCategoryIds)}
-                                  className="text-brand-600 rounded"
-                                />
-                                <span>{parent.name}</span>
-                              </label>
-
-                              {children.length > 0 && (
-                                <div className="pl-6 space-y-1 border-l-2 border-slate-200 ml-2">
-                                  {children.map((child) => (
-                                    <label key={child.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-medium hover:text-brand-600">
-                                      <input
-                                        type="checkbox"
-                                        checked={editCategoryIds.includes(child.id)}
-                                        onChange={() => toggleCategory(child.id, editCategoryIds, setEditCategoryIds)}
-                                        className="text-brand-600 rounded"
-                                      />
-                                      <span>{child.name}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
+                        {renderCategoryTree(null, editCategoryIds, setEditCategoryIds)}
                       </div>
                     </div>
 

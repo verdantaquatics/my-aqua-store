@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { name, phone, email, subject, message } = body
+
+    const tooLong = [name, phone, email, subject].some((v) => typeof v === 'string' && v.length > 200) ||
+      (typeof message === 'string' && message.length > 5000)
+    if (tooLong) {
+      return NextResponse.json({ error: 'Your message is too long.' }, { status: 400 })
+    }
 
     if (!name?.trim() || !phone?.trim() || !message?.trim()) {
       return NextResponse.json(
@@ -33,19 +40,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Contact Form Save Error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to send message.' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, message: 'Message sent successfully!' })
   } catch (err: any) {
     console.error('Contact API Exception:', err)
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 // GET: Fetch all messages (Admin)
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('contact_messages')
@@ -65,6 +77,11 @@ export async function GET(request: NextRequest) {
 // PATCH: Toggle is_read or delete (Admin)
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
     const { id, is_read, action } = body

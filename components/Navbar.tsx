@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ShoppingBag, Menu, X, ChevronDown, ChevronRight, ShieldCheck, ArrowRight, Heart, User, Search } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useStore } from '@/context/StoreContext'
@@ -14,6 +15,7 @@ interface NavbarProps {
 }
 
 export default function Navbar({ onCartToggle }: NavbarProps) {
+  const router = useRouter()
   const { cartCount } = useCart()
   const { settings, categories, isAdmin } = useStore()
   const { customer, isLoggedIn, wishlistCount, openAuthModal, customerLogout } = useCustomer()
@@ -326,34 +328,24 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                const input = (e.currentTarget.elements.namedItem('mobileSearch') as HTMLInputElement)?.value
+                const input = (e.currentTarget.elements.namedItem('mobileSearch') as HTMLInputElement)?.value?.trim()
                 if (input) {
-                  const topInput = document.getElementById('top-product-search') as HTMLInputElement
-                  if (topInput) {
-                    topInput.value = input
-                    topInput.dispatchEvent(new Event('input', { bubbles: true }))
-                    topInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                  } else {
-                    window.location.href = `/?search=${encodeURIComponent(input)}#catalog`
-                  }
+                  // The home page reads ?search= and renders results in the catalog section
+                  ;(document.activeElement as HTMLElement | null)?.blur()
+                  setMobileSearchOpen(false)
+                  router.push(`/?search=${encodeURIComponent(input)}#catalog`)
                 }
               }}
               className="relative flex items-center"
             >
               <Search className="absolute left-3.5 h-4 w-4 text-brand-600/70 pointer-events-none" />
               <input
-                type="text"
+                type="search"
                 name="mobileSearch"
+                enterKeyHint="search"
                 autoFocus
                 placeholder={isBangla ? 'পণ্য বা কালেকশন খুঁজুন...' : 'Search products...'}
-                className="w-full rounded-xl border-2 border-brand-500/50 bg-slate-50 py-2.5 pl-10 pr-9 text-xs font-medium text-slate-900 outline-none focus:border-brand-600 focus:bg-white"
-                onChange={(e) => {
-                  const topInput = document.getElementById('top-product-search') as HTMLInputElement
-                  if (topInput) {
-                    topInput.value = e.target.value
-                    topInput.dispatchEvent(new Event('input', { bubbles: true }))
-                  }
-                }}
+                className="w-full rounded-xl border-2 border-brand-500/50 bg-slate-50 py-2.5 pl-10 pr-9 text-base sm:text-xs font-medium text-slate-900 outline-none focus:border-brand-600 focus:bg-white"
               />
               <button
                 type="button"

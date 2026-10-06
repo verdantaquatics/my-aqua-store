@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
-import { getStoreSettings, invalidateSettingsCache, DEFAULT_SETTINGS, StoreSettings } from '@/utils/settings'
+import {
+  getStoreSettings,
+  invalidateSettingsCache,
+  StoreSettings,
+  SECRET_SETTING_KEYS,
+  isMaskedSecret,
+  maskSecretSettings
+} from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
 import { verifyStaffAuth } from '@/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
-// GET: Return current settings for admin panel
-// Note: Sensitive fields can be masked for viewing if desired, but we provide full value or placeholders
-export async function GET() {
-  try {
-    const settings = await getStoreSettings(true)
-    return NextResponse.json(settings)
-  } catch (error: any) {
-    console.error('Failed to get settings:', error)
-    return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
-  }
+// Tracking IDs are interpolated into inline <script> tags, so only allow their real formats
+const TRACKING_ID_FORMATS: Record<string, RegExp> = {
+  google_tag_manager_id: /^GTM-[A-Z0-9]+$/i,
+  google_analytics_id: /^(G|UA|AW)-[A-Z0-9-]+$/i,
+  tiktok_pixel_id: /^[A-Z0-9]+$/i
 }
 
 // PUT: Update settings (Shop Owner & Admin only)
@@ -28,6 +30,23 @@ export async function PUT(request: NextRequest) {
 
     const supabase = createAdminClient()
     const body: Partial<StoreSettings> = await request.json()
+
+    // Secrets are shown masked in the dashboard; an unchanged mask means "keep the current value"
+    for (const key of SECRET_SETTING_KEYS) {
+      if (isMaskedSecret((body as any)[key])) delete (body as any)[key]
+    }
+
+    for (const [key, format] of Object.entries(TRACKING_ID_FORMATS)) {
+      const value = (body as any)[key]
+      if (typeof value === 'string' && value.trim() && !format.test(value.trim())) {
+        return NextResponse.json({ error: `Invalid format for ${key.replace(/_/g, ' ')}.` }, { status: 400 })
+      }
+    }
+
+    // Custom <head> scripts run on every page: restricted to the shop owner
+    if (body.custom_head_scripts !== undefined && auth.role !== 'shop_owner') {
+      delete body.custom_head_scripts
+    }
 
     // Fetch existing settings
     const current = await getStoreSettings(true)
@@ -111,6 +130,26 @@ export async function PUT(request: NextRequest) {
       show_trending: body.show_trending !== undefined ? Boolean(body.show_trending) : current.show_trending,
       auto_best_seller: body.auto_best_seller !== undefined ? Boolean(body.auto_best_seller) : current.auto_best_seller,
       auto_trending: body.auto_trending !== undefined ? Boolean(body.auto_trending) : current.auto_trending,
+      invoice_print_colorful: body.invoice_print_colorful !== undefined ? Boolean(body.invoice_print_colorful) : current.invoice_print_colorful,
+      hero_overlay_opacity: body.hero_overlay_opacity !== undefined
+        ? Math.min(100, Math.max(0, Number(body.hero_overlay_opacity) || 0))
+        : current.hero_overlay_opacity,
+      showcase_overlay_opacity: body.showcase_overlay_opacity !== undefined
+        ? Math.min(100, Math.max(0, Number(body.showcase_overlay_opacity) || 0))
+        : current.showcase_overlay_opacity,
+      watermark_image_url: body.watermark_image_url !== undefined ? body.watermark_image_url : current.watermark_image_url,
+      about_quality_title: body.about_quality_title !== undefined ? body.about_quality_title : current.about_quality_title,
+      about_quality_desc: body.about_quality_desc !== undefined ? body.about_quality_desc : current.about_quality_desc,
+      about_delivery_title: body.about_delivery_title !== undefined ? body.about_delivery_title : current.about_delivery_title,
+      about_delivery_desc: body.about_delivery_desc !== undefined ? body.about_delivery_desc : current.about_delivery_desc,
+      about_support_title: body.about_support_title !== undefined ? body.about_support_title : current.about_support_title,
+      about_support_desc: body.about_support_desc !== undefined ? body.about_support_desc : current.about_support_desc,
+      show_all_products: body.show_all_products !== undefined ? Boolean(body.show_all_products) : current.show_all_products,
+      protect_images: body.protect_images !== undefined ? Boolean(body.protect_images) : current.protect_images,
+      delivery_mode: body.delivery_mode !== undefined ? (body.delivery_mode === 'flat' ? 'flat' : 'zone') : current.delivery_mode,
+      delivery_charge_flat: body.delivery_charge_flat !== undefined
+        ? Math.max(0, Number(body.delivery_charge_flat) || 0)
+        : current.delivery_charge_flat,
       updated_at: new Date().toISOString()
     }
 
@@ -119,80 +158,45 @@ export async function PUT(request: NextRequest) {
       .from('store_settings')
       .select('id')
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    let savedData
-    if (existingRow?.id) {
-      let { data, error } = await supabase
-        .from('store_settings')
-        .update(updatedPayload)
-        .eq('id', existingRow.id)
-        .select()
-        .maybeSingle()
+    // Save, dropping any column the database doesn't have yet (migration not run)
+    // so one missing column never blocks the rest of the settings from saving.
+    const payload: Record<string, any> = { ...updatedPayload }
+    const skippedColumns: string[] = []
 
-      // If schema cache lacks newly added columns (before SQL migration is run)
-      if (error && (error.message?.includes('schema cache') || error.code === 'PGRST204')) {
-        const fallbackPayload: Record<string, any> = { ...updatedPayload }
-        delete fallbackPayload.resend_from_email
-        delete fallbackPayload.email_invoice_enabled
-        delete fallbackPayload.daily_digest_enabled
-        delete fallbackPayload.daily_digest_time
-        delete fallbackPayload.daily_digest_email
-        const retry = await supabase
-          .from('store_settings')
-          .update(fallbackPayload)
-          .eq('id', existingRow.id)
-          .select()
-          .maybeSingle()
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const query = existingRow?.id
+        ? supabase.from('store_settings').update(payload).eq('id', existingRow.id)
+        : supabase.from('store_settings').insert({ id: '00000000-0000-0000-0000-000000000001', ...payload })
 
-        if (retry.error) throw retry.error
-        data = retry.data
-      } else if (error) {
-        throw error
-      }
+      const { error } = await query
+      if (!error) break
 
-      savedData = data || updatedPayload
-    } else {
-      let { data, error } = await supabase
-        .from('store_settings')
-        .insert({
-          id: '00000000-0000-0000-0000-000000000001',
-          ...updatedPayload
-        })
-        .select()
-        .maybeSingle()
+      const missing = error.code === 'PGRST204' ? error.message?.match(/'([^']+)' column/)?.[1] : undefined
+      if (!missing || !(missing in payload)) throw error
+      delete payload[missing]
+      skippedColumns.push(missing)
+    }
 
-      if (error && (error.message?.includes('schema cache') || error.code === 'PGRST204')) {
-        const fallbackPayload: Record<string, any> = { ...updatedPayload }
-        delete fallbackPayload.resend_from_email
-        delete fallbackPayload.email_invoice_enabled
-        delete fallbackPayload.daily_digest_enabled
-        delete fallbackPayload.daily_digest_time
-        delete fallbackPayload.daily_digest_email
-        const retry = await supabase
-          .from('store_settings')
-          .insert({
-            id: '00000000-0000-0000-0000-000000000001',
-            ...fallbackPayload
-          })
-          .select()
-          .maybeSingle()
-
-        if (retry.error) throw retry.error
-        data = retry.data
-      } else if (error) {
-        throw error
-      }
-
-      savedData = data || updatedPayload
+    if (skippedColumns.length > 0) {
+      console.warn('store_settings is missing columns (run the latest SQL migration):', skippedColumns.join(', '))
     }
 
     // Clear server in-memory cache
     invalidateSettingsCache()
 
-    return NextResponse.json({ success: true, data: savedData })
+    // Return the normalised settings (not the raw row) so the dashboard shows exactly what was stored
+    const fresh = await getStoreSettings(true)
+    return NextResponse.json({
+      success: true,
+      data: maskSecretSettings(fresh),
+      ...(skippedColumns.length > 0
+        ? { warning: `Some settings could not be saved until the latest SQL migration is run: ${skippedColumns.join(', ')}` }
+        : {})
+    })
   } catch (error: any) {
     console.error('Failed to update settings:', error)
-    return NextResponse.json({ error: error.message || 'Failed to update settings' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
   }
 }

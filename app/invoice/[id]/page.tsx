@@ -35,5 +35,17 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
     notFound()
   }
 
-  return <InvoiceClient order={order} settings={settings} />
+  // Only pass what the invoice renders: this object is serialized to the browser
+  const { user_id, customer_id, payment_details, ...invoiceOrder } = order
+  const safeOrder = {
+    ...invoiceOrder,
+    payment_details: {
+      advance_paid: payment_details?.advance_paid,
+      shipping_metadata: payment_details?.shipping_metadata,
+      transaction_id: payment_details?.transaction_id,
+      trx_id: payment_details?.trx_id
+    }
+  }
+
+  return <InvoiceClient order={safeOrder} settings={settings} />
 }

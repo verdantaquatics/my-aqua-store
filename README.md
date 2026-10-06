@@ -1,111 +1,107 @@
-# AquaStore - Streamlined Next.js 15 Monolith E-Commerce
+# Verdant Aquatics: Online Store
 
-Welcome to the **AquaStore** project, a lightweight, high-performance, and secure e-commerce application built specifically for selling aquariums and accessories. 
+The e-commerce site for **Verdant Aquatics**, an aquarium, aquascaping and live-plant shop based in Khulna, Bangladesh.
 
-This README documents the project context, architectural decisions, completed work, steps to fix the Next.js resolution error, and future tasks to perform. This document acts as a handoff file so that you can transfer the project to another machine and resume with a new coding assistant from this exact point.
-
----
-
-## 1. Project Context & Summary of Conversation
-
-### Initial State
-We started with a workspace containing the **BS-Commerce monorepo**, which was multi-tenant and composed of a NestJS API backend (`headless`), a Next.js storefront client (`storefront`), and separate storeadmin/superadmin panels. This stack was identified as too heavy, complex to maintain, and expensive to host for a single-store local aquarium shop.
-
-### Core Business Requirements
-1. **Catalog Size**: ~30 products (aquariums, filters, plants, accessories) with a few variation attributes (e.g. size in feet, capacity, colors).
-2. **Bangladesh Payment & Courier Integrations**:
-   - **bKash Tokenized Checkout**: Needs to support both full prepaid checkouts and Cash on Delivery (COD).
-   - **Pathao Courier Aladdin API**: Automatic courier dispatching.
-   - **Prepaid Delivery Fee Policy**: In the case of COD, buyers must pay the delivery charge (৳60 inside Dhaka, ৳120 outside Dhaka) upfront via bKash. The product price is collected by the courier on delivery.
-3. **Priorities**: Maximum speed, clean UI, ease of checkout, secure admin management, and low hosting costs.
-
-### Architectural Decisions
-- **Next.js 15 (App Router) & React 19 Monolith**: We initialized a brand new standalone monolith under the `/aquarium-store` directory. Next.js App Router was chosen to optimize loading speeds (global CDNs) and ease development (API routes and page rendering in one folder).
-- **Supabase Integration**:
-  - We swapped the monorepo's incomplete MySQL/MongoDB stack with **Supabase (PostgreSQL)**.
-  - Supabase handles **Database** (PostgreSQL with `JSONB` for product variations), **Authentication** (Admin & User login), and **Storage** (image buckets for product pictures) under a single free tier.
-  - We configured **Row-Level Security (RLS)** to protect customer records and restrict catalog uploads to whitelisted admin accounts.
-- **Salvaged Design**: We retained `packages/storefront` within the workspace as a visual reference and adapted its green, modern, clean UI styles to Next.js 15.
+Designed and developed by **BigApeWeb**.
 
 ---
 
-## 2. What We Have Built (Current Implementation)
+## Stack
 
-We constructed the complete project skeleton and implemented all core logic files:
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) + React 19, TypeScript |
+| Styling | Tailwind CSS (theme palettes switchable from the dashboard) |
+| Database, auth, storage | Supabase (PostgreSQL, Supabase Auth, Storage bucket `store-assets`) |
+| Payments | bKash Tokenized Checkout (merchant) and bKash Personal "Send Money" with manual verification |
+| Couriers | Pathao (Aladdin API) and Steadfast, with automatic booking and status sync |
+| Email | Resend (invoices, dispatch/cancel notices, daily digest, promo campaigns) |
 
-1. **System Configs**:
-   - [`package.json`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/package.json): Outlines Next.js 15, React 19, Tailwind CSS, Supabase SSR, and Axios.
-   - [`tailwind.config.js`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/tailwind.config.js): Custom color configurations (emerald plant themes) and page entry animations.
-   - [`next.config.mjs`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/next.config.mjs): Added Supabase hostnames whitelist for Next.js Image components.
-2. **Database SQL Script**:
-   - [`supabase_schema.sql`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/supabase_schema.sql): Creates all SQL tables (`categories`, `products`, `orders`, `order_items`), sets up granular RLS security policies, inserts the **30 seed items**, and registers the trigger function `decrement_product_stock` to handle stock levels dynamically.
-3. **Supabase Connections**:
-   - Client and Server helpers inside [`utils/supabase/`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/utils/supabase/) using cookie-based handlers.
-   - [`middleware.ts`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/middleware.ts): Root Next.js middleware refreshing user sessions and guarding the `/admin/*` routes.
-4. **Storefront Frontend Pages**:
-   - [`CartContext.tsx`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/context/CartContext.tsx): Context state provider that stores items, quantities, and selected variations in localStorage.
-   - [`Navbar.tsx`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/Navbar.tsx) & [`CartDrawer.tsx`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/CartDrawer.tsx): Layout elements and sidebar shopping cart side-drawers.
-   - [`page.tsx`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/page.tsx) & [`HomePageClient.tsx`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/HomePageClient.tsx): Landing page with responsive catalog filtering and search queries.
-   - [Product Detail Page](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/product/%5Bslug%5D/page.tsx) & [Client Layout](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/ProductDetailClient.tsx): Showcase product pictures, sizes/attribute selectors, stock status, and add-to-cart inputs.
-   - [Checkout Page](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/checkout/page.tsx): Address inputs, Pathao Courier dropdowns, dynamic shipping calculations (Dhaka vs Non-Dhaka), and payment selection toggles.
-   - [Order Success](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/order/confirmation/page.tsx) & [Order Failed](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/order/failed/page.tsx) receipt templates.
-5. **Secure Admin Dashboard**:
-   - [Admin Login](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/login/page.tsx): Login screen restricted to admin whitelists.
-   - [Admin Layout & Dashboard](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/admin/page.tsx) & [Client View](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/AdminDashboardClient.tsx): Visual sales analytics (total sales, revenue, shipping collections, COD collectibles) and orders log table.
-   - [Products Inventory Manager](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/admin/products/page.tsx) & [Client Form](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/components/AdminProductsClient.tsx): Catalog management grids allowing to add or delete items, and configure variations lists as JSON.
-6. **API Integration Routes**:
-   - [`app/api/pathao/route.ts`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/api/pathao/route.ts): Handles token grants and fetches cities, zones, and areas from Pathao's servers.
-   - [`app/api/bkash/route.ts`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/api/bkash/route.ts): Creates payment links (setting payment total depending on COD vs Full Prepayment selection), capture executes bKash payments, updates inventory stocks, and automatically requests consignment bookings inside Pathao Courier.
-   - [`app/api/admin/dispatch/route.ts`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/app/api/admin/dispatch/route.ts): Allows manual dispatch overrides if automatic booking fails.
+## Features
 
----
+- **Storefront**: hero banner; Featured / Trending / Best Seller sliders; category pages (unlimited nesting); product variations with their own price, stock and photo; wishlist; English/Bangla UI; order tracking; printable invoices.
+- **Checkout**: COD (optionally with the delivery charge collected upfront), full bKash payment, or bKash Personal. Delivery is charged per zone (inside/outside the store's city), and promo codes are supported. All prices are re-calculated on the server.
+- **Customer accounts**: order history, saved address, wishlist, password reset.
+- **Dashboard** (`/stradmn`): orders, products, categories, customers and messages, promotions and promo codes, staff with roles, stats, and store settings (branding, payments, couriers, email and tracking pixels).
 
-## 3. Resolving the Next.js Resolution Error
+## Project structure
 
-> [!WARNING]
-> **Issue**: When running `npm run dev` before executing `npm install` inside `/aquarium-store`, the system looks up the parent folder directory and resolves `next` to the monorepo's parent `node_modules`. Because the parent uses **Next.js 12** (which does not support the `app/` directory), it throws:
-> `Error: Couldn't find a pages directory. Please create one under the project root.`
-
-### The Resolution Steps:
-To fix this, you **must run `npm install` inside the `aquarium-store` directory** to download Next.js 15 dependencies locally before starting the server. Run the following:
-
-```bash
-# 1. Access the project directory
-cd aquarium-store
-
-# 2. Install all local dependencies (This downloads Next.js 15, React 19, Supabase, and Tailwind)
-npm install
-
-# 3. Start the Next.js 15 development server
-npm run dev
+```
+app/                 Routes (storefront pages, /stradmn dashboard, /api route handlers)
+components/          UI components (storefront + Admin*Client dashboard screens)
+context/             Cart, customer, store-settings and language providers
+utils/               Server helpers: auth, pricing, settings, courier, email, inventory
+utils/supabase/      Supabase clients (browser, server, middleware)
+supabase_*.sql       Database setup and migrations (see below)
 ```
 
+## Getting started
+
+```bash
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run dev                  # http://localhost:3000
+```
+
+### Environment variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public anon key (safe in the browser *only* with the v7 RLS policies applied) |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server only. Never expose it. |
+| `NEXT_PUBLIC_APP_URL` | yes | Public site URL, used for bKash callbacks and email links |
+| `CRON_SECRET` | yes, for crons | Random string. Cron endpoints reject requests without `Authorization: Bearer <CRON_SECRET>`. |
+| `BKASH_*`, `PATHAO_*`, `STEADFAST_*`, `RESEND_*` | optional | Fallbacks. Normally these are set from Dashboard > Settings. |
+
+### Database
+
+**New site:** run `supabase_setup.sql` in the Supabase SQL Editor. Set `owner_email` in section 9 first. This one file creates every table, column, security policy and function. Optionally run `supabase_schema.sql` afterwards to load demo categories and products.
+
+**Existing site (Verdant Aquatics):** run `supabase_migrate_v7_security.sql` once. It applies the same security policies and adds the newer settings columns. Running `supabase_setup.sql` again also works; it is safe to re-run.
+
+When you change the database, update `supabase_setup.sql` so it stays the complete template, and add a small `supabase_migrate_vN_*.sql` for sites that already exist. The other `supabase_migrate_*.sql` files are history.
+
+### Dashboard access
+
+1. In Supabase, go to **Authentication > Users > Add user** and create the owner login (tick *Auto Confirm User*).
+2. Put that email in section 9 of `supabase_setup.sql` and run it. Alternatively, insert a row into `staff_members` with `role = 'shop_owner'`.
+3. Sign in at `/stradmn/login`. Add other staff from **Dashboard > Staff**.
+
+Access is granted **only** by an active `staff_members` row linked to the login. Email patterns and user metadata are never trusted.
+
+Recommended Supabase Auth settings:
+- **Disable "Allow new users to sign up"**. Customer accounts are created by the server (`/api/customer/auth`) through the admin API, so public sign-up isn't needed.
+- Enable MFA for the owner account.
+
+### Password reset
+
+"Forgot password?" is on the customer sign-in popup and on `/stradmn/login`. The server creates a one-time recovery link and emails it through **Resend** using the store's own sender. The link opens `/auth/confirm`, which signs the user in and forwards to `/reset-password`. Customers then go to `/account`, staff to `/stradmn`.
+
+Setup checklist:
+1. In Dashboard > Settings > Email, set the Resend API key and a "from" address on a domain verified in Resend. On the free plan, unverified senders (`onboarding@resend.dev`) can only email your own Resend account address.
+2. Set `NEXT_PUBLIC_APP_URL` to the live site URL. The reset link is built from it.
+3. Optional fallback (used only when no Resend key is set): in Supabase > Authentication > URL Configuration, set the Site URL and add `https://<your-domain>/auth/confirm` to Redirect URLs. Supabase's built-in mailer only reaches your own team members on the free plan, so also add Resend under Authentication > SMTP Settings (host `smtp.resend.com`, port 465, user `resend`, password = your Resend API key).
+
+### Scheduled jobs
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/cron/courier-sync` | Pulls delivery status from Pathao/Steadfast and marks orders completed or returned |
+| `GET /api/cron/daily-digest` | Emails the pending-orders summary at the hour set in Settings (run hourly) |
+
+Both require the `CRON_SECRET` bearer header. Vercel Cron sends it automatically when `CRON_SECRET` is set.
+
+## Deployment
+
+Deploy to Vercel (or any Node host): set the environment variables, then run `npm run build`. Uploads are compressed in the browser before upload so they stay under hosting request-size limits.
+
+## Security notes
+
+- Order totals, delivery charges and promo discounts are computed on the server (`utils/order-pricing.ts`). bKash callbacks are verified against the order's invoice number and amount.
+- Store secrets (bKash, courier, Resend and pixel tokens) never leave the server. The dashboard shows them masked.
+- Product descriptions are sanitized (`utils/sanitize.ts`). Customer-supplied text in emails is HTML-escaped.
+
 ---
 
-## 4. What We Still Need to Do (Handoff Tasks for Next Agent)
-
-When you resume with a coding assistant on your next machine, ask the agent to complete these final steps:
-
-### Task 1: Connect Supabase API Keys
-- Create a project on Supabase and copy the **API URL**, **Anon Key**, and **Service Role Key**.
-- Open the SQL Editor in Supabase and run the query script inside [`supabase_schema.sql`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/supabase_schema.sql) to seed the database.
-- Edit [`aquarium-store/.env.local`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/.env.local) and paste these keys.
-
-### Task 2: Configure bKash & Pathao Sandbox Credentials
-- Input sandbox credentials (App Key, App Secret, Client ID, Client Secret, Store ID) in [`aquarium-store/.env.local`](file:///d:/Work/BS-Commerce/v5/BS-Commerce/aquarium-store/.env.local).
-- Make sure `NEXT_PUBLIC_APP_URL` is set to `http://localhost:3000` (locally) or your production domain.
-
-### Task 3: Create Admin Account
-- In the Supabase Auth panel, create an email login with `admin@example.com` (or any email containing `admin`).
-- Go to `/login` to sign in and open the dashboard panel.
-
-### Task 4: Sandbox Checkout Tests
-- Add a custom variant (e.g. standard aquarium 2 Feet) to the cart.
-- Proceed to checkout, select a city (e.g. Dhaka), zone, and area (confirming Pathao dropdowns load).
-- Select **Cash on Delivery** and click checkout. Ensure you get redirected to bKash's sandbox page charging you only the delivery fee (e.g. ৳60).
-- Confirm payment using bKash dummy credential values.
-- Verify redirect to `/order/confirmation` containing a Pathao tracking consignment ID and a receipt breaking down the cash-to-collect.
-
-### Task 5: Production Build and Vercel Deployment
-- Run `npm run build` to verify compiling.
-- Connect the Git repository to Vercel, set Root Directory to `aquarium-store`, paste environment keys, and publish.
+© BigApeWeb. Built for Verdant Aquatics.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/utils/supabase/server'
+import { ilikeExact, cleanPhoneNumber, phoneVariants } from '@/utils/postgrest'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ export async function GET() {
     const { data: customer } = await adminDb
       .from('customers')
       .select('*')
-      .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+      .or(`user_id.eq.${user.id},email.ilike.${ilikeExact(cleanEmail)}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -44,7 +45,7 @@ export async function GET() {
     return NextResponse.json({ customer })
   } catch (error: any) {
     console.error('Customer profile fetch error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to fetch customer profile' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch customer profile' }, { status: 500 })
   }
 }
 
@@ -63,17 +64,31 @@ export async function PATCH(request: NextRequest) {
     const { full_name, phone, avatar_url, address, city_id, zone_id, area_id } = body
 
     const cleanEmail = user.email?.toLowerCase().trim() || ''
-    const cleanPhone = phone !== undefined ? phone.trim().replace(/[^0-9+]/g, '') : undefined
-    const cleanName = full_name !== undefined ? full_name.trim() : undefined
+    const cleanPhone = phone !== undefined ? cleanPhoneNumber(phone) : undefined
+    const cleanName = full_name !== undefined ? String(full_name).trim() : undefined
 
     // Check if customer record exists
     const { data: existingCustomer } = await adminDb
       .from('customers')
       .select('*')
-      .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+      .or(`user_id.eq.${user.id},email.ilike.${ilikeExact(cleanEmail)}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // A phone number can only belong to one customer account
+    if (cleanPhone) {
+      const { data: phoneOwners } = await adminDb
+        .from('customers')
+        .select('id, user_id')
+        .in('phone', phoneVariants(cleanPhone))
+      const takenByOther = (phoneOwners || []).some(
+        (c: any) => c.id !== existingCustomer?.id && c.user_id !== user.id
+      )
+      if (takenByOther) {
+        return NextResponse.json({ error: 'This phone number is already linked to another account.' }, { status: 400 })
+      }
+    }
 
     let updatedCustomer: any = null
 
@@ -87,7 +102,7 @@ export async function PATCH(request: NextRequest) {
       if (cleanName !== undefined) updates.full_name = cleanName
       if (cleanPhone !== undefined) updates.phone = cleanPhone
       if (avatar_url !== undefined) updates.avatar_url = avatar_url
-      if (address !== undefined) updates.address = address.trim()
+      if (address !== undefined) updates.address = String(address).trim()
       if (city_id !== undefined) updates.city_id = Number(city_id || 0)
       if (zone_id !== undefined) updates.zone_id = Number(zone_id || 0)
       if (area_id !== undefined) updates.area_id = Number(area_id || 0)
@@ -143,6 +158,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, customer: updatedCustomer })
   } catch (error: any) {
     console.error('Customer profile update error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to update profile' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
   }
 }

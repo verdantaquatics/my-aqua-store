@@ -2,6 +2,35 @@ import { getStoreSettings } from '@/utils/settings'
 import { createAdminClient } from '@/utils/supabase/server'
 import axios from 'axios'
 
+// Customer-supplied text (names, addresses, messages) must never be rendered as HTML in emails
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Escape every string field of an email payload except the recipient address
+function escapePayload<T extends Record<string, any>>(payload: T): T {
+  const out: Record<string, any> = {}
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === 'toEmail') out[key] = value
+    else if (typeof value === 'string') out[key] = escapeHtml(value)
+    else if (key === 'items' && Array.isArray(value)) {
+      out[key] = value.map((item: any) => ({
+        ...item,
+        name: escapeHtml(item.name),
+        selectedVariations: item.selectedVariations
+          ? Object.fromEntries(Object.entries(item.selectedVariations).map(([k, v]) => [escapeHtml(k), escapeHtml(v)]))
+          : item.selectedVariations
+      }))
+    } else out[key] = value
+  }
+  return out as T
+}
+
 interface InvoiceEmailPayload {
   toEmail: string
   customerName: string
@@ -34,6 +63,7 @@ export async function getResendApiKey(): Promise<string> {
  * Send automated order confirmation invoice email via Resend
  */
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload) {
+  payload = escapePayload(payload)
   try {
     const settings = await getStoreSettings()
 
@@ -201,6 +231,7 @@ interface OrderDispatchedPayload {
  * Send automated order dispatched email to customer via Resend
  */
 export async function sendOrderDispatchedEmail(payload: OrderDispatchedPayload) {
+  payload = escapePayload(payload)
   try {
     const settings = await getStoreSettings()
 
@@ -326,6 +357,7 @@ interface OrderCancelledPayload {
  * Send automated order cancelled email to customer via Resend
  */
 export async function sendOrderCancelledEmail(payload: OrderCancelledPayload) {
+  payload = escapePayload(payload)
   try {
     const settings = await getStoreSettings()
 
@@ -436,7 +468,9 @@ export async function sendPromoEmail(
     const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
     const sender = fromEmail.includes('<') ? fromEmail : `${storeName} <${fromEmail}>`
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const fullCtaUrl = ctaUrl.startsWith('http') ? ctaUrl : `${appUrl}${ctaUrl}`
+    // Only http(s) links or site-relative paths are allowed as the button target
+    const safeCtaUrl = /^https?:\/\//i.test(ctaUrl) || ctaUrl.startsWith('/') ? ctaUrl : '/'
+    const fullCtaUrl = safeCtaUrl.startsWith('http') ? safeCtaUrl : `${appUrl}${safeCtaUrl}`
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -574,7 +608,7 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
     const orderRowsHtml = orders.map((o) => {
       const shortId = o.id.slice(0, 8).toUpperCase()
       const total = Number(o.total_price || 0)
-      const itemsText = (o.order_items || []).map((it: any) => `${it.quantity}x ${it.products?.name || 'Item'}`).join(', ') || 'No items'
+      const itemsText = (o.order_items || []).map((it: any) => `${it.quantity}x ${escapeHtml(it.products?.name || 'Item')}`).join(', ') || 'No items'
       const isVerification = o.payment_status === 'Pending Verification'
 
       return `
@@ -588,9 +622,9 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
             </div>
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #1e293b;">
-            <strong>${o.customer_name}</strong>
-            <div style="font-size: 11px; color: #64748b;">${o.customer_phone}</div>
-            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">${o.shipping_address || ''}</div>
+            <strong>${escapeHtml(o.customer_name)}</strong>
+            <div style="font-size: 11px; color: #64748b;">${escapeHtml(o.customer_phone)}</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">${escapeHtml(o.shipping_address)}</div>
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #334155; max-width: 180px;">
             ${itemsText}
@@ -618,16 +652,16 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
             <div>
-              <strong style="font-size: 13px; color: #0f172a;">${msg.name}</strong>
-              <span style="font-size: 11px; color: #64748b; margin-left: 6px;">(${msg.phone}${msg.email ? ` • ${msg.email}` : ''})</span>
+              <strong style="font-size: 13px; color: #0f172a;">${escapeHtml(msg.name)}</strong>
+              <span style="font-size: 11px; color: #64748b; margin-left: 6px;">(${escapeHtml(msg.phone)}${msg.email ? ` • ${escapeHtml(msg.email)}` : ''})</span>
             </div>
             <span style="font-size: 10px; color: #94a3b8; white-space: nowrap;">${msgDate}, ${msgTime}</span>
           </div>
           <div style="font-size: 11px; font-weight: bold; color: #4338ca; margin-bottom: 4px;">
-            Subject: ${msg.subject || 'General Inquiry'}
+            Subject: ${escapeHtml(msg.subject || 'General Inquiry')}
           </div>
           <div style="font-size: 12px; color: #334155; line-height: 1.5; background-color: #ffffff; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #6366f1;">
-            "${msg.message}"
+            "${escapeHtml(msg.message)}"
           </div>
         </div>
       `
@@ -765,6 +799,67 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
   } catch (error: any) {
     const errorDetails = error.response?.data || error.message
     console.error('[Resend] sendDailyPendingOrdersSummary error:', errorDetails)
+    return { success: false, error: error.response?.data?.message || error.message }
+  }
+}
+
+/**
+ * Send a password reset link (customers and staff). Always sent, regardless of
+ * the order-email toggles, because it is requested by the account owner.
+ */
+export async function sendPasswordResetEmail(payload: { toEmail: string; resetUrl: string }) {
+  try {
+    const settings = await getStoreSettings()
+    const apiKey = await getResendApiKey()
+    if (!apiKey) {
+      return { success: false, reason: 'No Resend API key configured' }
+    }
+
+    const storeName = escapeHtml(settings.store_name || 'Online Store')
+    const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
+    const sender = fromEmail.includes('<') ? fromEmail : `${settings.store_name || 'Online Store'} <${fromEmail}>`
+    const resetUrl = escapeHtml(payload.resetUrl)
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head><meta charset="utf-8"><title>Reset your password</title></head>
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="max-width: 520px; margin: 32px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+          <h1 style="margin: 0 0 4px 0; font-size: 18px; color: #0f172a;">${storeName}</h1>
+          <h2 style="margin: 16px 0 8px 0; font-size: 16px; color: #0f172a;">Reset your password</h2>
+          <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+            We received a request to reset the password for your account. Click the button below to choose a new password.
+            This link expires in 1 hour and can only be used once.
+          </p>
+          <a href="${resetUrl}" style="display: inline-block; background: #059669; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 8px;">
+            Choose a new password
+          </a>
+          <p style="margin: 24px 0 0 0; font-size: 12px; line-height: 1.6; color: #94a3b8;">
+            If you didn't ask for this, you can ignore this email - your password won't change.<br/>
+            Button not working? Copy this link into your browser:<br/>
+            <span style="word-break: break-all; color: #64748b;">${resetUrl}</span>
+          </p>
+        </div>
+      </body>
+    </html>
+    `
+
+    const response = await axios.post('https://api.resend.com/emails', {
+      from: sender,
+      to: [payload.toEmail],
+      subject: `Reset your password - ${settings.store_name || 'Online Store'}`,
+      html: htmlContent
+    }, {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    return { success: true, data: response.data }
+  } catch (error: any) {
+    console.error('[Resend] sendPasswordResetEmail error:', error.response?.data || error.message)
     return { success: false, error: error.response?.data?.message || error.message }
   }
 }

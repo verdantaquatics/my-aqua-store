@@ -17,7 +17,7 @@ interface ImageUploaderProps {
 }
 
 // Client-side canvas compression for images with optional watermark
-async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEnabled?: boolean): Promise<File> {
+export async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEnabled?: boolean): Promise<File> {
   // If not image or is SVG / GIF, return as-is
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
     return file
@@ -59,6 +59,7 @@ async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEna
         ctx.drawImage(img, 0, 0, width, height)
 
         const finish = () => {
+          try {
           canvas.toBlob(
             (blob) => {
               if (blob) {
@@ -74,6 +75,10 @@ async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEna
             'image/webp',
             0.85
           )
+          } catch {
+            // Canvas tainted by a cross-origin watermark: upload without it
+            resolve(file)
+          }
         }
 
         // Apply watermark if enabled and logo URL is valid
@@ -112,6 +117,16 @@ async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEna
     }
     reader.onerror = () => resolve(file)
   })
+}
+
+// Hosting limits reject large bodies with a non-JSON error page, so parse defensively
+export async function readUploadResponse(res: Response): Promise<{ url?: string; error?: string }> {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: res.status === 413 ? 'File is too large to upload. Please use a smaller file.' : `Upload failed (${res.status})` }
+  }
 }
 
 export default function ImageUploader({
@@ -242,7 +257,7 @@ export default function ImageUploader({
       body: formData
     })
 
-    const data = await res.json()
+    const data = await readUploadResponse(res)
     if (!res.ok || !data.url) {
       throw new Error(data.error || 'Upload error')
     }

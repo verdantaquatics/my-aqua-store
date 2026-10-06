@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { X, Sparkles, ArrowRight } from 'lucide-react'
 
 interface Promotion {
@@ -25,6 +26,7 @@ const COOLDOWN_HOURS = 24
 
 export default function PromoBanner({ banner }: PromoBannerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     if (!banner || !banner.is_active || !banner.image_url) return
@@ -62,7 +64,7 @@ export default function PromoBanner({ banner }: PromoBannerProps) {
     setIsOpen(false)
   }
 
-  if (!isOpen || !banner || !banner.image_url) return null
+  if (!isOpen || !banner || !banner.image_url || pathname?.startsWith('/invoice')) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-300">
