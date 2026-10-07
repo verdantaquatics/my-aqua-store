@@ -21,6 +21,7 @@
     "lucide-react": "^0.453.0",
     "next": "^15.0.0",
     "nextjs-toploader": "^3.9.17",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0-rc-6f233b4426-20241022",
     "react-dom": "^19.0.0-rc-6f233b4426-20241022",
     "sanitize-html": "^2.18.0"

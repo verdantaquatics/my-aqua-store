@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import Link from 'next/link'
 import { Printer, ArrowLeft, Palette, FileText } from 'lucide-react'
 import { PublicStoreSettings } from '@/utils/settings'
@@ -389,6 +390,22 @@ export default function InvoiceClient({ order, settings }: InvoiceClientProps) {
           )}
 
           <p className="text-[10px] text-slate-400 print:text-black font-semibold">For parcel queries or tracking, quote your Order No: #{formatOrderNumber(order.id)}</p>
+
+          {/* Website credit */}
+          <div className="mt-4 pt-3 border-t border-dashed border-slate-200 print:border-slate-400 flex items-center justify-center gap-2.5">
+            <QRCodeSVG value="https://bigapeweb.com" size={44} level="M" marginSize={0} />
+            <div className="text-left leading-tight">
+              <p className="text-[10px] text-slate-500 print:text-black">Website crafted by <strong className="text-slate-700 print:text-black">BigApeWeb</strong></p>
+              <a
+                href="https://bigapeweb.com"
+                target="_blank"
+                rel="noopener"
+                className="text-[9px] text-slate-400 print:text-black hover:text-brand-600"
+              >
+                bigapeweb.com
+              </a>
+            </div>
+          </div>
         </div>
 
       </div>

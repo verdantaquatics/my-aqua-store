@@ -7,6 +7,7 @@ import { useCart } from '@/context/CartContext'
 import { useCustomer } from '@/context/CustomerContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { resolveVariantSelection } from '@/utils/variations'
+import { htmlToPlainText } from '@/utils/product-columns'
 
 export interface VariationValue {
   label: string
@@ -194,6 +195,9 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
     if (onAddToCartSuccess) onAddToCartSuccess()
   }
 
+  // One-line summary for the card: short description, else the start of the full description
+  const cardSummary = htmlToPlainText(product.short_description || '') || htmlToPlainText(product.description || '')
+
   // Find Category Name
   const productCatIds: string[] = Array.isArray(product.variations?.category_ids)
     ? product.variations.category_ids
@@ -258,16 +262,18 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
         </p>
 
         <Link href={`/product/${product.slug}`}>
-          <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 sm:line-clamp-1 leading-snug group-hover:text-brand-600 transition-colors">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 sm:line-clamp-1 leading-snug min-h-[2.75em] sm:min-h-0 group-hover:text-brand-600 transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        {product.short_description && product.short_description.trim() ? (
-          <p className="hidden sm:block mt-1 text-xs text-slate-500 line-clamp-2 sm:line-clamp-3 flex-grow leading-relaxed">
-            {product.short_description.trim()}
+        {/* Always the same height so cards line up, even without a short description */}
+        <div className="hidden sm:block mt-1">
+          <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 min-h-[4.875em]">
+            {cardSummary}
           </p>
-        ) : null}
+        </div>
+        <div className="flex-grow" />
 
         {/* Price & Action button bar */}
         <div className="mt-2.5 sm:mt-4 flex items-center justify-between pt-2 border-t border-slate-100">

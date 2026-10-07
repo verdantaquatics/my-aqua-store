@@ -276,8 +276,18 @@ export default function Footer() {
         {/* Copyright */}
         <div className="mt-12 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {isBangla ? toBengaliDigits(new Date().getFullYear()) : new Date().getFullYear()} {settings.store_name}. {t('footer.rights_reserved')}</p>
-          <p className="text-[11px] text-slate-600">
-            {settings.store_name} • E-Commerce Platform
+          <p className="text-[11px] text-slate-500">
+            {isBangla ? 'ওয়েবসাইট তৈরি করেছে ' : 'Crafted with '}
+            {!isBangla && <span className="text-rose-500" aria-hidden="true">♥</span>}
+            {!isBangla && ' by '}
+            <a
+              href="https://bigapeweb.com"
+              target="_blank"
+              rel="noopener"
+              className="font-bold text-slate-300 hover:text-brand-400 transition"
+            >
+              BigApeWeb
+            </a>
           </p>
         </div>
       </div>

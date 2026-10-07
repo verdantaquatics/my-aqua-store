@@ -13,6 +13,7 @@ import { parseProductVariations, VariationOption } from '@/utils/variations'
 import ProductCard from '@/components/ProductCard'
 import { useLanguage } from '@/context/LanguageContext'
 import { describeDeliveryCharges } from '@/utils/delivery'
+import CollapsibleDescription from '@/components/CollapsibleDescription'
 
 interface Product {
   id: string
@@ -236,7 +237,6 @@ export default function ProductDetailClient({ product, categories, relatedProduc
           </div>
 
           {/* SPECIFICATION DETAILS */}
-          {/* gap (not space-y) so the mobile re-ordering below keeps even spacing */}
           <div className="flex flex-col gap-6">
             <div>
               <div className="flex flex-wrap gap-1.5 mb-2">
@@ -270,17 +270,6 @@ export default function ProductDetailClient({ product, categories, relatedProduc
               )}
             </div>
 
-            {/* Description: below the add-to-cart section on mobile, in place on desktop */}
-            {isRichDescription ? (
-              <div
-                className="order-last lg:order-none prose prose-sm max-w-none text-slate-600 leading-relaxed font-normal"
-                dangerouslySetInnerHTML={{ __html: product.description }}
-              />
-            ) : (
-              <p className="order-last lg:order-none text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
-            )}
-
-            {/* Dynamic Variations Selectors */}
             {/* Dynamic Variations Selectors */}
             {parsedOptions.length > 0 && (
               <div className="space-y-5 pt-2">
@@ -418,6 +407,13 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                 <Heart className="h-4 w-4 text-pink-400 fill-current" />
                 <span>{isBangla ? 'পছন্দের তালিকায় যুক্ত হয়েছে! স্থায়ীভাবে সংরক্ষণ করতে লগইন করুন।' : 'Added to wishlist! Sign in to keep it saved permanently.'}</span>
               </div>
+            )}
+
+            {/* Description (after the buy buttons; long ones collapse with a "Show full description" toggle) */}
+            {product.description && (
+              isRichDescription
+                ? <CollapsibleDescription html={product.description} />
+                : <CollapsibleDescription text={product.description} />
             )}
 
             {/* Delivery Policy Banner (Generic & Provider-Agnostic) */}
