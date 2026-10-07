@@ -236,7 +236,8 @@ export default function ProductDetailClient({ product, categories, relatedProduc
           </div>
 
           {/* SPECIFICATION DETAILS */}
-          <div className="flex flex-col space-y-6">
+          {/* gap (not space-y) so the mobile re-ordering below keeps even spacing */}
+          <div className="flex flex-col gap-6">
             <div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {(() => {
@@ -269,14 +270,14 @@ export default function ProductDetailClient({ product, categories, relatedProduc
               )}
             </div>
 
-            {/* Description */}
+            {/* Description: below the add-to-cart section on mobile, in place on desktop */}
             {isRichDescription ? (
               <div
-                className="prose prose-sm max-w-none text-slate-600 leading-relaxed font-normal"
+                className="order-last lg:order-none prose prose-sm max-w-none text-slate-600 leading-relaxed font-normal"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             ) : (
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+              <p className="order-last lg:order-none text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
             )}
 
             {/* Dynamic Variations Selectors */}
@@ -420,7 +421,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
             )}
 
             {/* Delivery Policy Banner (Generic & Provider-Agnostic) */}
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 mt-6 text-xs text-slate-700 space-y-1.5">
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-700 space-y-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-900">
                 <Truck className="h-4 w-4 text-brand-600" />
                 <span>{t('hero.fast_delivery')}</span>

@@ -491,9 +491,10 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                       Hero Banner Background Image
                     </label>
-                    <p className="text-[11px] text-slate-500 mb-2">High-resolution banner background image (auto-compressed on upload).</p>
+                    <p className="text-[11px] text-slate-500 mb-2">Full-screen banner background. Uploaded at original resolution (files over 4MB are reduced to 4K at high quality). Recommended: at least 1920px wide.</p>
                     <ImageUploader
                       folder="branding"
+                      highResolution
                       value={settings.hero_image_url ? [settings.hero_image_url] : []}
                       maxImages={1}
                       single={true}

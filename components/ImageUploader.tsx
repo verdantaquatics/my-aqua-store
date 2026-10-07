@@ -14,10 +14,25 @@ interface ImageUploaderProps {
   label?: string
   description?: string
   single?: boolean
+  // Full-screen images (hero banner): keep original quality instead of the 1200px product compression
+  highResolution?: boolean
+}
+
+// Hosting rejects request bodies over ~4.5MB; originals at or under this are uploaded untouched
+const MAX_UNCOMPRESSED_UPLOAD_BYTES = 4 * 1024 * 1024
+
+interface CompressOptions {
+  maxDimension?: number
+  quality?: number
 }
 
 // Client-side canvas compression for images with optional watermark
-export async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEnabled?: boolean): Promise<File> {
+export async function compressImage(
+  file: File,
+  watermarkLogoUrl?: string,
+  watermarkEnabled?: boolean,
+  { maxDimension = 1200, quality = 0.85 }: CompressOptions = {}
+): Promise<File> {
   // If not image or is SVG / GIF, return as-is
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
     return file
@@ -31,8 +46,8 @@ export async function compressImage(file: File, watermarkLogoUrl?: string, water
       img.src = e.target?.result as string
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        const MAX_WIDTH = 1200
-        const MAX_HEIGHT = 1200
+        const MAX_WIDTH = maxDimension
+        const MAX_HEIGHT = maxDimension
         let width = img.width
         let height = img.height
 
@@ -73,7 +88,7 @@ export async function compressImage(file: File, watermarkLogoUrl?: string, water
               }
             },
             'image/webp',
-            0.85
+            quality
           )
           } catch {
             // Canvas tainted by a cross-origin watermark: upload without it
@@ -137,7 +152,8 @@ export default function ImageUploader({
   allowVideo = false,
   label,
   description = 'PNG, JPG, WEBP up to 10MB',
-  single = false
+  single = false,
+  highResolution = false
 }: ImageUploaderProps) {
   const { settings } = useStore()
   const [uploading, setUploading] = useState(false)
@@ -190,7 +206,12 @@ export default function ImageUploader({
 
         if (single) {
           setProgressText(`Uploading ${file.name}...`)
-          if (file.type.startsWith('image/')) {
+          if (highResolution && file.type.startsWith('image/')) {
+            // Keep the original; only shrink (to 4K, high quality) if it's too big to upload
+            if (file.size > MAX_UNCOMPRESSED_UPLOAD_BYTES) {
+              file = await compressImage(file, undefined, false, { maxDimension: 3840, quality: 0.92 })
+            }
+          } else if (file.type.startsWith('image/')) {
             const wmUrl = folder !== 'branding' ? (settings?.watermark_image_url || settings?.logo_url) : undefined
             file = await compressImage(file, wmUrl, folder !== 'branding' ? settings?.watermark_enabled : false)
           }
