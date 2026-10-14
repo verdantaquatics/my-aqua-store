@@ -262,7 +262,7 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
         </p>
 
         <Link href={`/product/${product.slug}`}>
-          <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 sm:line-clamp-1 leading-snug min-h-[2.75em] sm:min-h-0 group-hover:text-brand-600 transition-colors">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 sm:line-clamp-1 leading-snug min-h-[2.75em] sm:min-h-0 group-hover:text-brand-600 transition-colors">
             {product.name}
           </h3>
         </Link>
@@ -318,13 +318,17 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
 
             {/* COMIC DIALOGUE BOX / VARIANT SELECTION POPOVER */}
             {showVariantModal && (
+              // Phones: dimmed backdrop + bottom sheet (a popover anchored to a half-width card ran off-screen)
+              <div className="sm:hidden fixed inset-0 z-[80] bg-slate-950/40" aria-hidden="true" />
+            )}
+            {showVariantModal && (
               <div
                 ref={modalRef}
-                className="absolute right-0 sm:right-0 bottom-full mb-3 z-50 w-64 sm:w-72 max-w-[85vw] rounded-2xl bg-white p-3.5 sm:p-4 shadow-2xl border-2 border-brand-500 animate-fade-in-up"
+                className="fixed inset-x-3 bottom-3 z-[90] sm:absolute sm:inset-x-auto sm:right-0 sm:bottom-full sm:mb-3 sm:z-50 sm:w-72 rounded-2xl bg-white p-4 shadow-2xl border-2 border-brand-500 animate-fade-in-up"
                 style={{ filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.15))' }}
               >
-                {/* Comic Speech Bubble Triangle Pointer */}
-                <div className="absolute -bottom-2 right-6 h-4 w-4 rotate-45 border-b-2 border-r-2 border-brand-500 bg-white" />
+                {/* Comic Speech Bubble Triangle Pointer (popover only) */}
+                <div className="hidden sm:block absolute -bottom-2 right-6 h-4 w-4 rotate-45 border-b-2 border-r-2 border-brand-500 bg-white" />
 
                 {/* Popover Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -345,7 +349,7 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
                 </div>
 
                 {/* Option Pickers */}
-                <div className="space-y-3 py-3 max-h-48 overflow-y-auto">
+                <div className="space-y-3 py-3 max-h-[50vh] sm:max-h-48 overflow-y-auto">
                   {parsedOptions.map((opt) => (
                     <div key={opt.name} className="space-y-1.5 text-left">
                       <label className="block text-[11px] font-bold text-slate-700 uppercase">

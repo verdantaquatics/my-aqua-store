@@ -174,7 +174,7 @@ function CarouselHeroBanner({
         <span className={`inline-flex items-center px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-lg ${heroBadge.bg}`}>
           {heroBadge.text}
         </span>
-        {activeProduct.old_price && activeProduct.old_price > 0 && (
+        {Number(activeProduct.old_price) > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white shadow-lg">
             <Tag className="h-3 w-3" />
             {isBangla ? `সাশ্রয় ৳${toBengaliDigits((Number(activeProduct.old_price) - Number(activeProduct.price)).toLocaleString())}` : `Save ৳${(Number(activeProduct.old_price) - Number(activeProduct.price)).toLocaleString()}`}
@@ -222,7 +222,7 @@ function CarouselHeroBanner({
               <span>
                 {t('product.buy_now')} • ৳{Number(activeProduct.price).toLocaleString()}
               </span>
-              {activeProduct.old_price && activeProduct.old_price > 0 && (
+              {Number(activeProduct.old_price) > 0 && (
                 <span className="text-[11px] text-slate-400 line-through font-normal ml-1 hidden sm:inline">
                   ৳{Number(activeProduct.old_price).toLocaleString()}
                 </span>

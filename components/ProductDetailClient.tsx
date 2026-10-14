@@ -167,13 +167,13 @@ export default function ProductDetailClient({ product, categories, relatedProduc
       </nav>
 
       {/* PRODUCT DETAIL BODY */}
-      <main className="flex-grow mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <main className="flex-grow mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-12 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-12">
           
-          {/* MEDIA SECTION */}
-          <div className="space-y-4">
+          {/* MEDIA SECTION (shorter on phones so the price and Add to Cart are visible without scrolling) */}
+          <div className="space-y-2 sm:space-y-4">
             <div
-              className="aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-center relative cursor-zoom-in"
+              className="aspect-[4/3] md:aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-center relative cursor-zoom-in"
               onMouseEnter={() => setIsZooming(true)}
               onMouseLeave={() => { setIsZooming(false); setZoomOrigin({ x: 50, y: 50 }) }}
               onMouseMove={(e) => {
@@ -206,7 +206,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
             
             {/* Thumbnails Gallery */}
             {product.images.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto py-2">
+              <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2">
                 {product.images.map((mediaUrl, idx) => {
                   const isMediaVideo = isVideo(mediaUrl)
                   const isSelected = selectedMedia === mediaUrl
@@ -216,7 +216,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                       key={idx}
                       type="button"
                       onClick={() => setSelectedMedia(mediaUrl)}
-                      className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 bg-slate-900 transition-all ${
+                      className={`relative h-14 w-14 sm:h-20 sm:w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 bg-slate-900 transition-all ${
                         isSelected ? 'border-brand-600 ring-2 ring-brand-500/20 shadow-md' : 'border-slate-200 opacity-80 hover:opacity-100'
                       }`}
                     >
@@ -237,7 +237,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
           </div>
 
           {/* SPECIFICATION DETAILS */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
             <div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {(() => {
@@ -257,12 +257,12 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                     ))
                 })()}
               </div>
-              <h1 className="text-3xl font-black text-slate-950 tracking-tight">{product.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight">{product.name}</h1>
             </div>
 
             {/* Price Box */}
-            <div className="flex items-baseline gap-3 py-3 border-y border-slate-200">
-              <span className="text-3xl font-black text-slate-950">৳{activePrice.toLocaleString()}</span>
+            <div className="flex items-baseline gap-3 py-2.5 sm:py-3 border-y border-slate-200">
+              <span className="text-2xl sm:text-3xl font-black text-slate-950">৳{activePrice.toLocaleString()}</span>
               {product.old_price > 0 && (
                 <span className="text-lg text-slate-400 line-through font-semibold">
                   ৳{Number(product.old_price).toLocaleString()}
@@ -348,9 +348,9 @@ export default function ProductDetailClient({ product, categories, relatedProduc
 
             {/* Quantity & Buy Button */}
             {isAvailable && (
-              <div className="flex flex-col sm:flex-row gap-4 pt-2">
+              <div className="flex items-stretch gap-2 sm:gap-4">
                 {/* Quantity input */}
-                <div className="flex items-center justify-between border border-slate-200 rounded-xl bg-white w-full sm:w-32 h-12 px-3">
+                <div className="flex items-center justify-between border border-slate-200 rounded-xl bg-white w-28 sm:w-32 h-12 px-3 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -374,7 +374,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                 <button
                   type="button"
                   onClick={handleAddToCart}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-base font-bold text-white shadow-lg hover:bg-brand-500 transition-all duration-200 h-12"
+                  className="flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 sm:px-6 py-3 text-sm sm:text-base font-bold text-white shadow-lg hover:bg-brand-500 transition-all duration-200 h-12 whitespace-nowrap"
                 >
                   <ShoppingBag className="h-5 w-5" />
                   {t('product.add_to_cart')}
@@ -384,7 +384,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                 <button
                   type="button"
                   onClick={handleWishlistToggle}
-                  className={`flex items-center justify-center gap-2 px-4 rounded-xl border-2 transition h-12 font-bold text-xs ${
+                  className={`flex flex-shrink-0 items-center justify-center gap-2 w-12 sm:w-auto sm:px-4 rounded-xl border-2 transition h-12 font-bold text-xs ${
                     isWishlisted
                       ? 'border-pink-500 bg-pink-50 text-pink-600'
                       : 'border-slate-200 hover:border-pink-300 hover:bg-pink-50/50 text-slate-700'

@@ -45,7 +45,7 @@ export default function CollapsibleDescription({ html, text }: CollapsibleDescri
         >
           {html ? (
             <div
-              className="prose prose-sm max-w-none text-slate-600 leading-relaxed font-normal"
+              className="rich-text text-sm text-slate-600 leading-relaxed"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (

@@ -49,7 +49,7 @@ export default function RichTextEditor({
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm max-w-none focus:outline-none min-h-[140px] px-3 py-2 text-xs text-slate-800 leading-relaxed'
+          'rich-text max-w-none focus:outline-none min-h-[140px] px-3 py-2 text-xs text-slate-800 leading-relaxed'
       }
     },
     onUpdate: ({ editor }) => {
