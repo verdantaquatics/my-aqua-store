@@ -9,8 +9,8 @@ interface PageProps {
 }
 
 // Each product page is generated on its first visit, then served from the CDN.
-// Refreshed every 5 minutes and immediately when products or stock change.
-export const revalidate = 300
+// Refreshed hourly and immediately when products or stock change.
+export const revalidate = 3600
 
 export async function generateStaticParams() {
   return []

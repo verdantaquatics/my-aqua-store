@@ -44,7 +44,11 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
       advance_paid: payment_details?.advance_paid,
       shipping_metadata: payment_details?.shipping_metadata,
       transaction_id: payment_details?.transaction_id,
-      trx_id: payment_details?.trx_id
+      trx_id: payment_details?.trx_id,
+      // Set when the store adjusted items after the order was placed
+      last_adjusted_at: Array.isArray(payment_details?.order_adjustments) && payment_details.order_adjustments.length > 0
+        ? payment_details.order_adjustments[payment_details.order_adjustments.length - 1]?.at || null
+        : null
     }
   }
 

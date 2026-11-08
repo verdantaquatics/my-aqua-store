@@ -4,8 +4,8 @@ import { getPublicSettings } from '@/utils/settings'
 import { notFound } from 'next/navigation'
 import CollectionPageClient from '@/components/CollectionPageClient'
 
-// Cached and served from the CDN; refreshed every 5 minutes and on changes
-export const revalidate = 300
+// Cached and served from the CDN; refreshed hourly and on changes
+export const revalidate = 3600
 
 export default async function BestSellerCollectionPage() {
   const settings = await getPublicSettings()

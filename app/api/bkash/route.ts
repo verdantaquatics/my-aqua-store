@@ -3,8 +3,8 @@ import { createAdminClient, createClient } from '@/utils/supabase/server'
 import { getStoreSettings, StoreSettings } from '@/utils/settings'
 import { bookPathaoConsignment, bookSteadfastConsignment } from '@/utils/courier'
 import { sendInvoiceEmail } from '@/utils/email'
-import { deductOrderInventory } from '@/utils/inventory'
-import { revalidateStorefront } from '@/utils/revalidate'
+import { takeOrderStock } from '@/utils/inventory'
+import { revalidateStockChanges } from '@/utils/revalidate'
 import { orValue, ilikeExact, phoneVariants } from '@/utils/postgrest'
 import {
   priceCart,
@@ -246,7 +246,9 @@ export async function POST(request: NextRequest) {
     const paymentDetails: Record<string, any> = {
       sender_number: sender_number ? String(sender_number).slice(0, 30) : '',
       transaction_id: transaction_id ? String(transaction_id).slice(0, 60) : '',
-      shipping_metadata: shippingMetadata
+      shipping_metadata: shippingMetadata,
+      // Set to true once the order's items are taken out of stock (utils/inventory.ts)
+      stock_deducted: false
     }
     if (isPersonalPrepay) paymentDetails.advance_paid = delivery_charge
 
@@ -332,9 +334,11 @@ export async function POST(request: NextRequest) {
     }))
 
     // Step D: Orders confirmed without the merchant gateway (bKash Personal / plain COD)
+    // take stock right away. Gateway orders take it once the payment succeeds.
     if (!needsGateway) {
-      await deductOrderInventory(supabase, order.id)
-      revalidateStorefront()
+      const { changes } = await takeOrderStock(supabase, order.id)
+      await revalidateStockChanges(supabase, changes)
+
 
       if (customer_email) {
         const paymentLabel = isBkashPersonal
@@ -505,9 +509,11 @@ export async function GET(request: NextRequest) {
         })
         .eq('id', order.id)
 
-      // Decrement stock now that payment is confirmed
-      await deductOrderInventory(supabase, order.id)
-      revalidateStorefront()
+      // Payment confirmed -> take stock now (unpaid gateway orders never hold stock)
+      {
+        const { changes } = await takeOrderStock(supabase, order.id)
+        await revalidateStockChanges(supabase, changes)
+      }
 
       // Send invoice email asynchronously if customer provided email
       if (order.customer_email) {

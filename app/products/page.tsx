@@ -5,8 +5,8 @@ import type { Metadata } from 'next'
 import { getPublicSettings } from '@/utils/settings'
 
 // Full catalog ("View all products" from the home page). Cached on the CDN;
-// refreshed every 5 minutes and whenever products or stock change.
-export const revalidate = 300
+// refreshed hourly and whenever products or stock change.
+export const revalidate = 3600
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings()

@@ -2,8 +2,8 @@ import { getPublicSettings } from '@/utils/settings'
 import ContactPageClient from '@/components/ContactPageClient'
 import type { Metadata } from 'next'
 
-// Cached and served from the CDN; refreshed every 5 minutes and on settings changes
-export const revalidate = 300
+// Cached and served from the CDN; refreshed hourly and on settings changes
+export const revalidate = 3600
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings()

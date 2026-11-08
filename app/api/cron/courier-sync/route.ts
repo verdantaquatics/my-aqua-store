@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
-import { restoreOrderInventory } from '@/utils/inventory'
-import { revalidateStorefront } from '@/utils/revalidate'
+import { syncOrderStock } from '@/utils/inventory'
+import { revalidateStockChanges } from '@/utils/revalidate'
 import { verifyStaffAuth } from '@/utils/auth'
 import { isAuthorizedCronRequest } from '@/utils/cron'
 
@@ -150,18 +150,22 @@ async function performCourierSync(): Promise<{
       )
 
       if (statusChanged) {
-        // If order returned/cancelled -> automatically restore inventory
-        if (currentOrderStatus !== 'Cancelled' && mapping.order_status === 'Cancelled') {
+        // Returned/cancelled -> give stock back; picked up/delivered -> make sure it was taken
+        let holdsStock: boolean | undefined
+        if (newOrderStatus !== currentOrderStatus) {
           try {
-            await restoreOrderInventory(supabase, order.id)
-            revalidateStorefront()
+            const stock = await syncOrderStock(supabase, order.id, newOrderStatus)
+            holdsStock = stock.holdsStock
+            await revalidateStockChanges(supabase, stock.changes)
           } catch (invErr) {
-            console.error(`Failed to restore inventory for order ${order.id}:`, invErr)
+            console.error(`Failed to update inventory for order ${order.id}:`, invErr)
           }
         }
 
         const updatedPaymentDetails = {
           ...(order.payment_details || {}),
+          // Keep the stock flag just written by syncOrderStock (order.payment_details is older)
+          ...(holdsStock !== undefined ? { stock_deducted: holdsStock } : {}),
           courier_sync: {
             provider,
             raw_status: rawStatus,

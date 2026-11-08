@@ -447,6 +447,206 @@ export async function sendOrderCancelledEmail(payload: OrderCancelledPayload) {
   }
 }
 
+export interface OrderItemChange {
+  name: string
+  selectedVariations?: Record<string, string> | null
+  fromQty: number
+  toQty: number // 0 = removed from the order
+}
+
+interface OrderUpdatedPayload {
+  toEmail: string
+  customerName: string
+  orderId: string
+  changes: OrderItemChange[]
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+    selectedVariations?: Record<string, string>
+  }>
+  deliveryCharge: number
+  discountAmount: number
+  totalPrice: number
+  advancePaid: number
+}
+
+/**
+ * Tell the customer their order was adjusted by the store (e.g. reduced quantity
+ * or an item removed because it ran out), with the updated items and totals.
+ * Sent only when the owner ticks "Email the customer" while editing the order.
+ */
+export async function sendOrderUpdatedEmail(payload: OrderUpdatedPayload) {
+  payload = escapePayload(payload)
+  try {
+    const settings = await getStoreSettings()
+    const apiKey = await getResendApiKey()
+    if (!apiKey || !payload.toEmail || !payload.toEmail.includes('@')) {
+      return { success: false, reason: 'No valid Resend API key or customer email' }
+    }
+
+    const storeName = settings.store_name || 'Online Store'
+    const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
+    const sender = fromEmail.includes('<') ? fromEmail : `${storeName} <${fromEmail}>`
+    const shortId = payload.orderId.slice(0, 8).toUpperCase()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    // `items` were already escaped by escapePayload; `changes` are escaped here
+    const variationText = (v?: Record<string, string> | null, escape = false) =>
+      v && typeof v === 'object' && Object.keys(v).length > 0
+        ? Object.entries(v).map(([k, val]) => escape ? `${escapeHtml(k)}: ${escapeHtml(val)}` : `${k}: ${val}`).join(', ')
+        : ''
+
+    const changeRows = payload.changes.map((c) => {
+      const vars = variationText(c.selectedVariations, true)
+      const what = c.toQty <= 0
+        ? `<span style="color: #b91c1c; font-weight: 700;">Removed</span> <span style="color: #64748b;">(was ${c.fromQty})</span>`
+        : `<span style="color: #64748b; text-decoration: line-through;">${c.fromQty}</span> &rarr; <strong>${c.toQty}</strong>`
+      return `
+      <tr>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #fde68a; font-size: 13px; color: #1e293b;">
+          <strong>${escapeHtml(c.name)}</strong>
+          ${vars ? `<div style="font-size: 11px; color: #64748b;">${vars}</div>` : ''}
+        </td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #fde68a; font-size: 13px; text-align: right;">${what}</td>
+      </tr>`
+    }).join('')
+
+    const itemRows = payload.items.map((item) => {
+      const vars = variationText(item.selectedVariations)
+      return `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b;">
+          <strong>${item.name}</strong>
+          ${vars ? `<div style="font-size: 11px; color: #64748b;">${vars}</div>` : ''}
+        </td>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b; text-align: center;">${item.quantity}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b; text-align: right; font-weight: bold;">
+          ৳${(Number(item.price) * item.quantity).toLocaleString()}
+        </td>
+      </tr>`
+    }).join('')
+
+    const subtotal = payload.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
+    const discount = Number(payload.discountAmount || 0)
+    const total = Number(payload.totalPrice)
+    const advance = Number(payload.advancePaid || 0)
+    const due = Math.max(0, total - advance)
+    const refund = Math.max(0, advance - total)
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Updated #${shortId}</title>
+      </head>
+      <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+
+          <!-- Header -->
+          <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">${storeName}</h1>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">Updated Order Confirmation</p>
+          </div>
+
+          <div style="padding: 24px;">
+            <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="margin: 0; font-size: 16px; color: #1e3a8a; font-weight: 700;">Your order #${shortId} has been updated</h2>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #1d4ed8; line-height: 1.5;">
+                Hello ${payload.customerName}, as discussed with you, we have adjusted your order. Here is what changed and your updated total.
+              </p>
+            </div>
+
+            ${changeRows ? `
+            <h3 style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #92400e;">What changed</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #fffbeb; border-radius: 8px;">
+              <tbody>${changeRows}</tbody>
+            </table>` : ''}
+
+            <h3 style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Your updated order</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f1f5f9; text-transform: uppercase; font-size: 11px; color: #64748b;">
+                  <th style="padding: 8px 10px; text-align: left;">Item</th>
+                  <th style="padding: 8px 10px; text-align: center;">Qty</th>
+                  <th style="padding: 8px 10px; text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>${itemRows}</tbody>
+            </table>
+
+            <table style="width: 100%; font-size: 13px; color: #475569; margin-bottom: 24px;">
+              <tr>
+                <td style="padding: 4px 0;">Subtotal</td>
+                <td style="padding: 4px 0; text-align: right; font-weight: bold;">৳${subtotal.toLocaleString()}</td>
+              </tr>
+              ${discount > 0 ? `
+              <tr>
+                <td style="padding: 4px 0; color: #10b981;">Discount</td>
+                <td style="padding: 4px 0; text-align: right; color: #10b981; font-weight: bold;">-৳${discount.toLocaleString()}</td>
+              </tr>` : ''}
+              <tr>
+                <td style="padding: 4px 0;">Delivery Charge</td>
+                <td style="padding: 4px 0; text-align: right;">৳${Number(payload.deliveryCharge).toLocaleString()}</td>
+              </tr>
+              <tr style="font-size: 16px; font-weight: 800; color: #0f172a;">
+                <td style="padding: 10px 0; border-top: 2px solid #e2e8f0;">New Total</td>
+                <td style="padding: 10px 0; border-top: 2px solid #e2e8f0; text-align: right; color: #059669;">৳${total.toLocaleString()}</td>
+              </tr>
+              ${advance > 0 ? `
+              <tr>
+                <td style="padding: 4px 0;">Already Paid</td>
+                <td style="padding: 4px 0; text-align: right;">৳${advance.toLocaleString()}</td>
+              </tr>` : ''}
+              <tr style="font-weight: 800; color: #92400e;">
+                <td style="padding: 4px 0;">${refund > 0 ? 'Amount to be refunded' : 'Pay on Delivery'}</td>
+                <td style="padding: 4px 0; text-align: right;">৳${(refund > 0 ? refund : due).toLocaleString()}</td>
+              </tr>
+            </table>
+
+            ${refund > 0 ? `
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+              You paid more than the new total. Our team will contact you to arrange the refund of ৳${refund.toLocaleString()}.
+            </p>` : ''}
+
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${appUrl}/invoice/${payload.orderId}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700;">
+                View Updated Invoice →
+              </a>
+            </div>
+
+            <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 12px; color: #94a3b8;">
+              <p style="margin: 0 0 4px 0;">Questions about these changes? Contact <strong>${settings.contact_phone || settings.contact_email}</strong></p>
+              <p style="margin: 0;">${storeName} • Bangladesh</p>
+            </div>
+          </div>
+        </div>
+      </body>
+    </html>
+    `
+
+    const response = await axios.post('https://api.resend.com/emails', {
+      from: sender,
+      to: [payload.toEmail],
+      subject: `Order #${shortId} Updated - ${storeName}`,
+      html: htmlContent
+    }, {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log(`[Resend] Order updated email sent to ${payload.toEmail}. ID:`, response.data?.id)
+    return { success: true, data: response.data }
+  } catch (error: any) {
+    console.error('[Resend] sendOrderUpdatedEmail error:', error.response?.data || error.message)
+    return { success: false, error: error.response?.data?.message || error.message }
+  }
+}
+
 /**
  * Send promotional broadcast email to multiple customers
  */

@@ -92,10 +92,20 @@ Setup checklist:
 
 Both require the `CRON_SECRET` bearer header. Vercel Cron sends it automatically when `CRON_SECRET` is set.
 
+## Stock & order changes
+
+- COD and bKash Personal orders take stock as soon as they are placed. bKash gateway orders take stock once the payment succeeds, so abandoned or failed payments never lock items as out of stock.
+- An order that doesn't hold stock yet (e.g. unpaid bKash) takes it when the store accepts or dispatches it. Stock is given back when an order is cancelled, returned or deleted.
+- `payment_details.stock_deducted` records whether an order currently holds stock, so stock is never taken twice or given back when it was never taken. The rules live in `utils/order-stock.ts`; use the helpers in `utils/inventory.ts` (`syncOrderStock`, `takeOrderStock`, `releaseOrderStock`) for any new code that changes an order's status.
+- Items can be changed on **Pending** and **Confirmed** orders (not after shipping or cancelling). The owner can lower or raise quantities and remove items, optionally put removed units back in stock, adjust the discount, and email the customer the updated order. The invoice updates automatically. Raising a quantity beyond what's in stock shows a warning.
+
 ## Performance & caching
 
-- Storefront pages (home, collections, categories, products, about, contact, track) are cached on the CDN and refreshed every 5 minutes. Category and product pages are generated on their first visit.
-- Any API route that changes what customers see must call `revalidateStorefront()` (`utils/revalidate.ts`) after a successful change, so the next visit gets fresh pages. Product, category, promotion, settings and order/stock routes already do.
+- Storefront pages (home, collections, categories, products, about, contact, track) are cached on the CDN and refreshed hourly. Category and product pages are generated on their first visit.
+- Every page rebuild counts as an ISR write on Vercel (free plan: 200K/month), so refreshes are kept narrow (`utils/revalidate.ts`):
+  - `revalidateStorefront()` refreshes the whole site. Use it only for changes that affect every page: products, categories, promotions, settings.
+  - `revalidateStockChanges(db, changes)` is for stock moved by orders (placed, cancelled, returned, edited). It refreshes only the affected product pages, plus the listing pages when a product went in or out of stock. The inventory helpers in `utils/inventory.ts` return the `changes` to pass in.
+  - Order changes that don't touch stock (status, dispatch, address, payment) need no refresh.
 - Middleware runs only for `/stradmn` (the dashboard gate). Storefront pages never read the session on the server; customer state is loaded in the browser.
 - **Vercel function region:** set *Project > Settings > Functions > Function Region* to the region closest to your Supabase project (Supabase > Project Settings > General > Region). For example, Mumbai is `bom1` and Singapore is `sin1`. Every database query from the server crosses that distance.
 

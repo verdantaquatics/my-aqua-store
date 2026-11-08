@@ -13,6 +13,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
 import AdminSidebar from '@/components/AdminSidebar'
+import { canEditOrderItems, orderHoldsStock } from '@/utils/order-stock'
 import axios from 'axios'
 
 interface OrderItem {
@@ -69,6 +70,7 @@ interface EditableItem {
   id: string
   name: string
   quantity: number
+  originalQuantity: number
   price: number
   selected_variations?: Record<string, string>
 }
@@ -121,6 +123,8 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
   const [editDiscountAmount, setEditDiscountAmount] = useState(0)
   const [editItems, setEditItems] = useState<EditableItem[]>([])
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([])
+  const [notifyCustomer, setNotifyCustomer] = useState(true)
+  const [restockRemoved, setRestockRemoved] = useState(false)
 
   const [locationCities, setLocationCities] = useState<any[]>([])
   const [locationZones, setLocationZones] = useState<any[]>([])
@@ -252,12 +256,15 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
     setEditAdvancePaid(initialAdvance)
     setEditDiscountAmount(Number(order.discount_amount || 0))
     setDeletedItemIds([])
+    setNotifyCustomer(true)
+    setRestockRemoved(false)
 
     // Populate editable items
     const itemsList: EditableItem[] = (order.order_items || []).map((it) => ({
       id: it.id,
       name: it.products?.name || 'Product Item',
       quantity: it.quantity,
+      originalQuantity: it.quantity,
       price: Number(it.price),
       selected_variations: it.selected_variations
     }))
@@ -297,6 +304,8 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
 
   // Handle Item Removal in Edit Modal
   const handleRemoveItem = (index: number) => {
+    // An order must keep at least one item; to drop everything, cancel the order
+    if (editItems.length <= 1) return
     const itemToRemove = editItems[index]
     if (itemToRemove?.id) {
       setDeletedItemIds((prev) => [...prev, itemToRemove.id])
@@ -334,12 +343,15 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
           order_status: editOrderStatus,
           payment_status: editPaymentStatus,
           advance_paid: editAdvancePaid,
+          discount_amount: editDiscountAmount,
           items: editItems.map((it) => ({
             id: it.id,
             quantity: it.quantity,
             price: it.price
           })),
-          deleted_item_ids: deletedItemIds
+          deleted_item_ids: deletedItemIds,
+          notify_customer: notifyCustomer && orderItemsOrTotalChanged,
+          restock_removed: restockRemoved
         })
       })
 
@@ -352,6 +364,16 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
         prev.map((o) => (o.id === editingOrder.id ? resJson.data : o))
       )
       setEditingOrder(null)
+
+      // Let the owner know whether the customer was emailed, and about courier follow-ups
+      const notes: string[] = []
+      if (resJson.customerEmail?.sent) {
+        notes.push(`Order updated. The customer was emailed the updated order at ${resJson.data?.customer_email}.`)
+      } else if (resJson.customerEmail && !resJson.customerEmail.sent) {
+        notes.push(`Order updated, but the customer email was not sent: ${resJson.customerEmail.reason}`)
+      }
+      if (Array.isArray(resJson.warnings)) notes.push(...resJson.warnings)
+      if (notes.length > 0) alert(notes.join('\n\n'))
     } catch (err: any) {
       console.error(err)
       alert(err.message || 'Error saving order changes.')
@@ -382,8 +404,12 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
       const resJson = await response.json()
       if (resJson.success) {
         setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, order_status: newStatus } : o))
+          prev.map((o) => (o.id === orderId ? (resJson.data || { ...o, order_status: newStatus }) : o))
         )
+        // e.g. accepting an order that asks for more units than are in stock
+        if (Array.isArray(resJson.warnings) && resJson.warnings.length > 0) {
+          alert(resJson.warnings.join('\n\n'))
+        }
       } else {
         alert(resJson.error || 'Failed to update status')
       }
@@ -449,6 +475,9 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? (resJson.data || { ...o, payment_status: newPaymentStatus, order_status: newOrderStatus }) : o))
         )
+        if (Array.isArray(resJson.warnings) && resJson.warnings.length > 0) {
+          alert(resJson.warnings.join('\n\n'))
+        }
 
         // Automatically trigger invoice email when payment is verified
         if (isVerified && order.customer_email) {
@@ -698,6 +727,9 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
           })
         )
         setDispatchConfirm(null)
+        if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+          alert(data.warnings.join('\n\n'))
+        }
       } else {
         alert(data.error || 'Courier booking failed.')
       }
@@ -711,8 +743,17 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
 
   // Live Calculations in Edit Modal
   const modalSubtotal = editItems.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 1), 0)
-  const modalDiscount = Number(editDiscountAmount || editingOrder?.discount_amount || 0)
+  const modalDiscount = Math.max(0, Number(editDiscountAmount) || 0)
   const modalTotalPrice = Math.max(0, modalSubtotal + editDeliveryCharge - modalDiscount)
+  const modalItemsChanged = deletedItemIds.length > 0 || editItems.some((it) => it.quantity !== it.originalQuantity)
+  const modalItemsReduced = deletedItemIds.length > 0 || editItems.some((it) => it.quantity < it.originalQuantity)
+  const orderItemsOrTotalChanged = !!editingOrder && (
+    modalItemsChanged || Math.abs(modalTotalPrice - Number(editingOrder.total_price || 0)) >= 0.01
+  )
+  // Items can be changed until the order ships; restocking only matters if the order holds stock
+  const canEditItems = !!editingOrder && canEditOrderItems(editingOrder.order_status)
+  const editingOrderHoldsStock = !!editingOrder && orderHoldsStock(editingOrder)
+  const editingOrderHasConsignment =!!(editingOrder?.pathao_consignment_id || editingOrder?.steadfast_consignment_id)
   const modalAdvancePaid = editAdvancePaid
   const modalDueOnDelivery = Math.max(0, modalTotalPrice - editAdvancePaid)
 
@@ -2112,6 +2153,12 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                   <span className="text-[11px] font-semibold text-slate-400">{editItems.length} items</span>
                 </div>
 
+                {!canEditItems && (
+                  <div className="p-3 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 text-[11px] font-medium">
+                    Items can't be changed after the order has shipped or been cancelled.
+                  </div>
+                )}
+
                 {editItems.length === 0 ? (
                   <div className="p-4 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-center font-medium">
                     All items removed. You can cancel or decline this order.
@@ -2129,11 +2176,19 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                           )}
                           <p className="text-[11px] text-slate-500 mt-0.5">
                             ৳{Number(item.price).toLocaleString()} / unit
+                            {item.quantity !== item.originalQuantity && (
+                              <span className="ml-1.5 font-bold text-amber-700">
+                                (customer ordered {item.originalQuantity})
+                              </span>
+                            )}
                           </p>
                         </div>
 
                         {/* Quantity Stepper */}
                         <div className="flex items-center gap-2">
+                          {!canEditItems ? (
+                            <span className="px-2.5 py-1 text-xs font-bold text-slate-900">× {item.quantity}</span>
+                          ) : (
                           <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                             <button
                               type="button"
@@ -2153,6 +2208,7 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
+                          )}
 
                           <div className="text-right min-w-[65px]">
                             <span className="font-black text-slate-900 text-xs">
@@ -2161,14 +2217,15 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                           </div>
 
                           {/* Remove Item Button */}
-                          <button
+                          {canEditItems && <button
                             type="button"
                             onClick={() => handleRemoveItem(idx)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Remove item from order"
+                            disabled={editItems.length <= 1}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400 disabled:cursor-not-allowed"
+                            title={editItems.length <= 1 ? 'An order needs at least one item. Cancel the order instead.' : 'Remove item from order'}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     ))}
@@ -2186,10 +2243,24 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                     <span className="font-bold text-slate-900">৳{modalSubtotal.toLocaleString()}</span>
                   </div>
 
-                  {modalDiscount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-bold">
-                      <span>Promo Discount {editingOrder.promo_code ? `(${editingOrder.promo_code})` : ''}:</span>
-                      <span>-৳{modalDiscount.toLocaleString()}</span>
+                  {(modalDiscount > 0 || Number(editingOrder.discount_amount || 0) > 0) && (
+                    <div className="flex items-center justify-between text-emerald-600 font-bold">
+                      <div>
+                        <span>Discount {editingOrder.promo_code ? `(${editingOrder.promo_code})` : ''}:</span>
+                        {modalItemsChanged && (
+                          <span className="text-[10px] text-slate-400 font-medium block">Set for the original order. Adjust if items changed.</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>-৳</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={editDiscountAmount}
+                          onChange={(e) => setEditDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-right text-emerald-700 outline-none focus:border-brand-500"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -2241,7 +2312,53 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                     <span>Balance Due on Delivery:</span>
                     <span>৳{modalDueOnDelivery.toLocaleString()}</span>
                   </div>
+
+                  {editAdvancePaid > modalTotalPrice && (
+                    <div className="flex justify-between text-xs font-black text-red-800 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                      <span>Refund owed to customer:</span>
+                      <span>৳{(editAdvancePaid - modalTotalPrice).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
+
+                {orderItemsOrTotalChanged && editOrderStatus !== 'Cancelled' && (
+                  <div className="space-y-2">
+                    {modalItemsReduced && editingOrderHoldsStock && (
+                      <label className="flex items-start gap-2.5 p-3 rounded-xl border bg-slate-50 border-slate-200 text-slate-700 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={restockRemoved}
+                          onChange={(e) => setRestockRemoved(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded accent-brand-600"
+                        />
+                        <span>
+                          <span className="font-bold block">Put removed units back in stock</span>
+                          Tick this if the units are actually on the shelf (e.g. the customer changed their mind). Leave it off if they were never really in stock.
+                        </span>
+                      </label>
+                    )}
+                    {editingOrderHasConsignment && (
+                      <div className="p-3 bg-amber-50 text-amber-900 rounded-xl border border-amber-200 text-[11px] font-medium">
+                        This order is already booked with the courier. After saving, update the COD (cash to collect) amount in the courier panel to ৳{modalDueOnDelivery.toLocaleString()}.
+                      </div>
+                    )}
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs ${editEmail ? 'bg-blue-50 border-blue-200 text-blue-900 cursor-pointer' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!editEmail && notifyCustomer}
+                        disabled={!editEmail}
+                        onChange={(e) => setNotifyCustomer(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded accent-brand-600"
+                      />
+                      <span>
+                        <span className="font-bold block">Email the customer the updated order</span>
+                        {editEmail
+                          ? <>Sends what changed, the new total and a link to the updated invoice to {editEmail}.</>
+                          : <>No email address on this order. Add one above to notify the customer.</>}
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
 
               {/* Modal Buttons */}

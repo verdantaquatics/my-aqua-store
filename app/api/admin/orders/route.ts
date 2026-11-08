@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
-import { revalidateStorefront } from '@/utils/revalidate'
-import { restoreOrderInventory, deductOrderInventory, restoreProductStock, deductProductStock } from '@/utils/inventory'
-import { sendOrderDispatchedEmail, sendOrderCancelledEmail } from '@/utils/email'
+import { revalidateStockChanges } from '@/utils/revalidate'
+import {
+  releaseOrderStock, restoreProductStock, deductProductStock, orderHoldsStock, statusHoldsStock, canEditOrderItems,
+  shortageOf, describeShortages, StockChange, StockShortage
+} from '@/utils/inventory'
+import { sendOrderDispatchedEmail, sendOrderCancelledEmail, sendOrderUpdatedEmail, OrderItemChange } from '@/utils/email'
 
 export const dynamic = 'force-dynamic'
+
+const MAX_LINE_QTY = 999
 
 export async function PUT(request: NextRequest) {
   try {
@@ -31,9 +36,13 @@ export async function PUT(request: NextRequest) {
       order_status,
       payment_status,
       advance_paid,
+      discount_amount, // optional: adjusted discount after item changes
       items, // array of { id, quantity, price }
-      deleted_item_ids // array of string IDs to remove
+      deleted_item_ids, // array of string IDs to remove
+      notify_customer, // optional: email the customer the updated order
+      restock_removed // optional (default true): put removed / reduced units back into stock
     } = body
+    const restockRemoved = restock_removed !== false
 
     if (!id || !customer_name || !customer_phone || !shipping_address) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -44,7 +53,7 @@ export async function PUT(request: NextRequest) {
     // 1. Fetch existing order
     const { data: existingOrder, error: fetchError } = await adminDb
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*, products(name))')
       .eq('id', id)
       .single()
 
@@ -54,98 +63,179 @@ export async function PUT(request: NextRequest) {
 
     const oldStatus = existingOrder.order_status || 'Pending'
     const newStatus = order_status || oldStatus
+    const willBeActive = newStatus !== 'Cancelled'
+    // See utils/order-stock.ts. `heldStock` = does the order hold stock right now?
+    // An order that doesn't (e.g. unpaid bKash) takes it when accepted; cancelling gives it back.
+    const heldStock = orderHoldsStock(existingOrder)
+    const holdStock = willBeActive && (heldStock || statusHoldsStock(newStatus))
 
-    // 2. INVENTORY RESTORATION / DEDUCTION ON STATUS CHANGE
-    if (oldStatus !== 'Cancelled' && newStatus === 'Cancelled') {
-      // Order cancelled -> Restore all item stocks to inventory
-      await restoreOrderInventory(adminDb, id)
-    } else if (oldStatus === 'Cancelled' && newStatus !== 'Cancelled') {
-      // Order re-activated from Cancelled -> Deduct item stocks from inventory
-      await deductOrderInventory(adminDb, id)
-    } else if (newStatus !== 'Cancelled') {
-      // Order is active and items are being edited:
+    // 2. Work out the item changes (only lines that belong to this order count)
+    const existingItems: any[] = existingOrder.order_items || []
+    const existingById = new Map<string, any>(existingItems.map((it) => [String(it.id), it]))
 
-      // A. Restore stock for deleted item lines
-      if (Array.isArray(deleted_item_ids) && deleted_item_ids.length > 0) {
-        for (const delId of deleted_item_ids) {
-          const delItem = existingOrder.order_items?.find((it: any) => it.id === delId)
-          if (delItem) {
-            await restoreProductStock(
-              adminDb,
-              delItem.product_id,
-              Number(delItem.quantity) || 0,
-              delItem.selected_variations
-            )
-          }
+    const deletedIds = new Set<string>(
+      (Array.isArray(deleted_item_ids) ? deleted_item_ids : [])
+        .map((x: any) => String(x))
+        .filter((x: string) => existingById.has(x))
+    )
+
+    const requested = new Map<string, { quantity: number; price: number }>()
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        const itemId = String(it?.id || '')
+        const existingItem = existingById.get(itemId)
+        if (!existingItem || deletedIds.has(itemId)) continue
+
+        const qty = Math.floor(Number(it.quantity))
+        if (!Number.isFinite(qty) || qty < 1 || qty > MAX_LINE_QTY) {
+          return NextResponse.json({ error: 'Invalid quantity for an item in this order.' }, { status: 400 })
         }
-      }
-
-      // B. Adjust stock difference for modified item quantities
-      if (Array.isArray(items) && items.length > 0) {
-        for (const it of items) {
-          if (it.id) {
-            const existingItem = existingOrder.order_items?.find((x: any) => x.id === it.id)
-            if (existingItem) {
-              const oldQty = Number(existingItem.quantity) || 0
-              const newQty = Math.max(1, Number(it.quantity || 1))
-              const diff = newQty - oldQty
-
-              if (diff > 0) {
-                await deductProductStock(adminDb, existingItem.product_id, diff, existingItem.selected_variations)
-              } else if (diff < 0) {
-                await restoreProductStock(adminDb, existingItem.product_id, Math.abs(diff), existingItem.selected_variations)
-              }
-            }
-          }
+        const price = it.price !== undefined && it.price !== null ? Number(it.price) : Number(existingItem.price)
+        if (!Number.isFinite(price) || price < 0) {
+          return NextResponse.json({ error: 'Invalid price for an item in this order.' }, { status: 400 })
         }
+        requested.set(itemId, { quantity: qty, price })
       }
     }
 
-    // 3. Handle deleted item IDs in database
-    if (Array.isArray(deleted_item_ids) && deleted_item_ids.length > 0) {
+    const finalLines = existingItems
+      .filter((it) => !deletedIds.has(String(it.id)))
+      .map((it) => {
+        const req = requested.get(String(it.id))
+        return {
+          item: it,
+          oldQty: Number(it.quantity) || 0,
+          quantity: req ? req.quantity : Number(it.quantity) || 0,
+          price: req ? req.price : Number(it.price) || 0
+        }
+      })
+
+    if (existingItems.length > 0 && finalLines.length === 0) {
+      return NextResponse.json(
+        { error: 'An order needs at least one item. To drop everything, cancel the order instead.' },
+        { status: 400 }
+      )
+    }
+
+    // Customer-facing summary of what changed (used for the email and the change history)
+    const itemChanges: OrderItemChange[] = []
+    for (const it of existingItems) {
+      if (deletedIds.has(String(it.id))) {
+        itemChanges.push({
+          name: it.products?.name || 'Product',
+          selectedVariations: it.selected_variations,
+          fromQty: Number(it.quantity) || 0,
+          toQty: 0
+        })
+      }
+    }
+    for (const line of finalLines) {
+      if (line.quantity !== line.oldQty) {
+        itemChanges.push({
+          name: line.item.products?.name || 'Product',
+          selectedVariations: line.item.selected_variations,
+          fromQty: line.oldQty,
+          toQty: line.quantity
+        })
+      }
+    }
+
+    // Validate everything before anything is written
+    let discountAmount = Number(existingOrder.discount_amount || 0)
+    if (discount_amount !== undefined && discount_amount !== null && discount_amount !== '') {
+      const d = Number(discount_amount)
+      if (!Number.isFinite(d) || d < 0) {
+        return NextResponse.json({ error: 'Invalid discount amount.' }, { status: 400 })
+      }
+      discountAmount = Math.round(d * 100) / 100
+    }
+
+    // Items can be changed on Pending and Confirmed orders, not once shipped or cancelled
+    // (the courier already has the parcel and its cash-to-collect amount)
+    const priceChanged = finalLines.some((line) => line.price !== Number(line.item.price))
+    if ((itemChanges.length > 0 || priceChanged) && !(canEditOrderItems(oldStatus) && willBeActive)) {
+      return NextResponse.json(
+        { error: 'Items can only be changed on Pending or Confirmed orders (not after shipping or cancelling).' },
+        { status: 400 }
+      )
+    }
+
+    // 3. Save item changes first, so stock only moves once the order itself is updated
+    if (deletedIds.size > 0) {
       const { error: deleteError } = await adminDb
         .from('order_items')
         .delete()
-        .in('id', deleted_item_ids)
+        .in('id', Array.from(deletedIds))
         .eq('order_id', id)
 
       if (deleteError) {
         console.error('Failed to delete order items:', deleteError)
+        return NextResponse.json({ error: 'Failed to remove items from the order.' }, { status: 500 })
       }
     }
 
-    // 4. Update existing item quantities & prices
-    let itemsSubtotal = 0
-    if (Array.isArray(items) && items.length > 0) {
-      for (const item of items) {
-        const qty = Math.max(1, Number(item.quantity || 1))
-        const price = Number(item.price || 0)
-        itemsSubtotal += price * qty
+    for (const line of finalLines) {
+      if (line.quantity === line.oldQty && line.price === Number(line.item.price)) continue
+      const { error: itemError } = await adminDb
+        .from('order_items')
+        .update({ quantity: line.quantity, price: line.price })
+        .eq('id', line.item.id)
+        .eq('order_id', id)
 
-        if (item.id) {
-          await adminDb
-            .from('order_items')
-            .update({
-              quantity: qty,
-              price: price
-            })
-            .eq('id', item.id)
-            .eq('order_id', id)
+      if (itemError) {
+        console.error('Failed to update order item:', itemError)
+        return NextResponse.json({ error: 'Failed to update item quantities.' }, { status: 500 })
+      }
+    }
+
+    // 4. Move stock to match
+    const stockChanges: Array<StockChange | null> = []
+    const shortages: StockShortage[] = []
+    const takeStock = async (line: (typeof finalLines)[number], qty: number) => {
+      const change = await deductProductStock(adminDb, line.item.product_id, qty, line.item.selected_variations)
+      stockChanges.push(change)
+      const short = shortageOf(change, qty, line.item.products?.name || 'Product')
+      if (short) shortages.push(short)
+    }
+
+    if (heldStock && !holdStock) {
+      // Cancelled: give back everything the order was holding (its original quantities)
+      for (const it of existingItems) {
+        stockChanges.push(await restoreProductStock(adminDb, it.product_id, Number(it.quantity) || 0, it.selected_variations))
+      }
+    } else if (!heldStock && holdStock) {
+      // Accepted (Confirmed / Shipped / ...): take the order's items out of stock now
+      for (const line of finalLines) {
+        await takeStock(line, line.quantity)
+      }
+    } else if (heldStock && holdStock) {
+      // Still active: take extra stock for increases. Removed lines and reduced quantities go
+      // back into stock only when the owner says so: when items were cut because they were
+      // never really in stock (inventory out of date), returning them would create phantom stock.
+      if (restockRemoved) {
+        for (const it of existingItems) {
+          if (deletedIds.has(String(it.id))) {
+            stockChanges.push(await restoreProductStock(adminDb, it.product_id, Number(it.quantity) || 0, it.selected_variations))
+          }
         }
       }
-    } else {
-      // If items array not provided, calculate subtotal from existing order_items
-      itemsSubtotal = (existingOrder.order_items || []).reduce((sum: number, it: any) => {
-        if (deleted_item_ids?.includes(it.id)) return sum
-        return sum + Number(it.price) * Number(it.quantity)
-      }, 0)
+      for (const line of finalLines) {
+        const diff = line.quantity - line.oldQty
+        if (diff > 0) {
+          await takeStock(line, diff)
+        } else if (diff < 0 && restockRemoved) {
+          stockChanges.push(await restoreProductStock(adminDb, line.item.product_id, -diff, line.item.selected_variations))
+        }
+      }
     }
 
-    const parsedDeliveryCharge = Number(delivery_charge !== undefined ? delivery_charge : existingOrder.delivery_charge)
-    const discountAmount = Number(existingOrder.discount_amount || 0)
+    // 5. Recalculate totals
+    const itemsSubtotal = finalLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
+    const parsedDeliveryCharge = Number(delivery_charge !== undefined ? delivery_charge : existingOrder.delivery_charge) || 0
+    const oldTotalPrice = Number(existingOrder.total_price) || 0
     const newTotalPrice = Math.max(0, itemsSubtotal + parsedDeliveryCharge - discountAmount)
 
-    // 5. Update payment_details with shipping metadata and custom advance_paid
+    // 6. Update payment_details with shipping metadata, custom advance_paid and change history
     const paymentDetails = existingOrder.payment_details || {}
     paymentDetails.shipping_metadata = {
       ...(paymentDetails.shipping_metadata || {}),
@@ -157,14 +247,41 @@ export async function PUT(request: NextRequest) {
     if (advance_paid !== undefined) {
       paymentDetails.advance_paid = Number(advance_paid)
     }
+    paymentDetails.stock_deducted = holdStock
 
-    // 6. Update the main order row
+    // A fully paid order whose total went up now has a balance to collect on delivery
+    let finalPaymentStatus = payment_status || existingOrder.payment_status
+    if (finalPaymentStatus === 'FullyPaid' && newTotalPrice > oldTotalPrice + 0.009) {
+      const paid = paymentDetails.advance_paid !== undefined ? Number(paymentDetails.advance_paid) : oldTotalPrice
+      if (paid + 0.009 < newTotalPrice) {
+        paymentDetails.advance_paid = paid
+        finalPaymentStatus = paid > 0 ? 'DeliveryChargePrePaid' : 'Pending'
+      }
+    }
+
+    const itemsOrTotalChanged = itemChanges.length > 0 || Math.abs(newTotalPrice - oldTotalPrice) >= 0.01
+    if (itemChanges.length > 0) {
+      const history = Array.isArray(paymentDetails.order_adjustments) ? paymentDetails.order_adjustments : []
+      paymentDetails.order_adjustments = [
+        ...history,
+        {
+          at: new Date().toISOString(),
+          by: auth.user?.email || null,
+          changes: itemChanges.map((c) => ({ name: c.name, from: c.fromQty, to: c.toQty })),
+          old_total: oldTotalPrice,
+          new_total: newTotalPrice
+        }
+      ].slice(-20)
+    }
+
+    // 7. Update the main order row
     const updatePayload: Record<string, any> = {
       customer_name,
       customer_phone,
       customer_email: customer_email || null,
       shipping_address,
       delivery_charge: parsedDeliveryCharge,
+      discount_amount: discountAmount,
       total_price: newTotalPrice,
       payment_details: paymentDetails
     }
@@ -173,7 +290,11 @@ export async function PUT(request: NextRequest) {
     if (zone_id !== undefined) updatePayload.zone_id = Number(zone_id)
     if (area_id !== undefined) updatePayload.area_id = Number(area_id)
     if (order_status) updatePayload.order_status = order_status
-    if (payment_status) updatePayload.payment_status = payment_status
+    if (finalPaymentStatus && finalPaymentStatus !== existingOrder.payment_status) {
+      updatePayload.payment_status = finalPaymentStatus
+    } else if (payment_status) {
+      updatePayload.payment_status = payment_status
+    }
 
     const { error: updateError } = await adminDb
       .from('orders')
@@ -185,7 +306,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    // 7. Fetch complete updated order with items and products
+    // 8. Fetch complete updated order with items and products
     const { data: updatedOrder, error: reloadError } = await adminDb
       .from('orders')
       .select('*, order_items(*, products(name))')
@@ -196,7 +317,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to reload updated order' }, { status: 500 })
     }
 
-    // 8. Trigger customer email notification on status change
+    // 9. Trigger customer email notification on status change
     const targetEmail = updatedOrder.customer_email || existingOrder.customer_email
     if (targetEmail && oldStatus !== newStatus) {
       if (newStatus === 'Cancelled') {
@@ -239,8 +360,53 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    revalidateStorefront()
-    return NextResponse.json({ success: true, data: updatedOrder })
+    // 10. Tell the customer about adjusted items / totals when the owner asked to
+    let customerEmail: { sent: boolean; reason?: string } | undefined
+    if (notify_customer && willBeActive && itemsOrTotalChanged) {
+      if (!targetEmail) {
+        customerEmail = { sent: false, reason: 'No email address on this order.' }
+      } else {
+        const advance = paymentDetails.advance_paid !== undefined
+          ? Number(paymentDetails.advance_paid)
+          : updatedOrder.payment_status === 'FullyPaid'
+            ? oldTotalPrice
+            : updatedOrder.payment_status === 'DeliveryChargePrePaid'
+              ? Number(existingOrder.delivery_charge || 0)
+              : 0
+        const result: any = await sendOrderUpdatedEmail({
+          toEmail: targetEmail,
+          customerName: updatedOrder.customer_name,
+          orderId: updatedOrder.id,
+          changes: itemChanges,
+          items: (updatedOrder.order_items || []).map((it: any) => ({
+            name: it.products?.name || 'Product',
+            quantity: Number(it.quantity),
+            price: Number(it.price),
+            selectedVariations: it.selected_variations || undefined
+          })),
+          deliveryCharge: Number(updatedOrder.delivery_charge || 0),
+          discountAmount: Number(updatedOrder.discount_amount || 0),
+          totalPrice: Number(updatedOrder.total_price),
+          advancePaid: advance
+        }).catch((err: any) => ({ success: false, error: err?.message }))
+        customerEmail = result?.success
+          ? { sent: true }
+          : { sent: false, reason: result?.reason || result?.error || 'Email could not be sent.' }
+      }
+    }
+
+    // Courier bookings keep the old COD amount; the owner must fix it in the courier panel
+    const warnings: string[] = []
+    const shortageWarning = describeShortages(shortages)
+    if (shortageWarning) warnings.push(shortageWarning)
+    const hasConsignment = updatedOrder.pathao_consignment_id || updatedOrder.steadfast_consignment_id
+    if (hasConsignment && willBeActive && Math.abs(newTotalPrice - oldTotalPrice) >= 0.01) {
+      warnings.push('This order is already booked with the courier. Update the COD (cash to collect) amount in the courier panel to match the new total.')
+    }
+
+    // Only stock changes affect the storefront; status/address/payment edits need no refresh
+    await revalidateStockChanges(adminDb, stockChanges)
+    return NextResponse.json({ success: true, data: updatedOrder, customerEmail, warnings })
 
   } catch (error: any) {
     console.error('Order Update Error:', error.message)
@@ -264,17 +430,8 @@ export async function DELETE(request: NextRequest) {
 
     const adminDb = createAdminClient()
 
-    // 1. Fetch order status before deletion
-    const { data: existingOrder } = await adminDb
-      .from('orders')
-      .select('order_status')
-      .eq('id', id)
-      .single()
-
-    // 2. Restore inventory if deleting an active (non-cancelled) order
-    if (existingOrder && existingOrder.order_status !== 'Cancelled') {
-      await restoreOrderInventory(adminDb, id)
-    }
+    // 1-2. Give back stock if the order was holding any (accepted and not cancelled)
+    const stockChanges: StockChange[] = await releaseOrderStock(adminDb, id)
 
     // 3. Delete order_items first
     const { error: itemsError } = await adminDb
@@ -297,7 +454,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: orderError.message }, { status: 500 })
     }
 
-    revalidateStorefront()
+    await revalidateStockChanges(adminDb, stockChanges)
     return NextResponse.json({ success: true, message: 'Order deleted successfully' })
   } catch (error: any) {
     console.error('Order Delete Error:', error.message)

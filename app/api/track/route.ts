@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
-import { restoreOrderInventory } from '@/utils/inventory'
-import { revalidateStorefront } from '@/utils/revalidate'
+import { syncOrderStock } from '@/utils/inventory'
+import { revalidateStockChanges } from '@/utils/revalidate'
 import { phoneVariants } from '@/utils/postgrest'
 
 const TRACK_COLUMNS = 'id, created_at, customer_name, customer_phone, shipping_address, order_status, payment_status, payment_method, payment_details, total_price, delivery_charge, discount_amount, shipping_provider, pathao_status, pathao_consignment_id, steadfast_consignment_id, steadfast_tracking_code, order_items(id, quantity, price, selected_variations, products(name, images))'
@@ -122,6 +122,8 @@ export async function GET(request: NextRequest) {
             const s = deliveryStatus.toLowerCase().replace(/[-_]/g, ' ').trim()
 
             if (s.includes('delivered') || s.includes('partial delivered') || s.includes('payment invoice settled') || s.includes('payment settled')) {
+              // Delivered: make sure the stock was taken (e.g. auto-booked orders never accepted)
+              await revalidateStockChanges(adminDb, (await syncOrderStock(adminDb, order.id, 'Completed')).changes)
               order.order_status = 'Completed'
               order.payment_status = 'FullyPaid'
               order.pathao_status = 'delivered'
@@ -132,8 +134,7 @@ export async function GET(request: NextRequest) {
               }).eq('id', order.id)
             } else if (s.includes('return') || s.includes('cancelled') || s.includes('canceled')) {
               if (order.order_status !== 'Cancelled') {
-                await restoreOrderInventory(adminDb, order.id)
-            revalidateStorefront()
+                await revalidateStockChanges(adminDb, (await syncOrderStock(adminDb, order.id, 'Cancelled')).changes)
               }
               order.order_status = 'Cancelled'
               order.pathao_status = 'returned'

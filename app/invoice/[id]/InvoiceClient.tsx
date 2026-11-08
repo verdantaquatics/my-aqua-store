@@ -183,6 +183,13 @@ export default function InvoiceClient({ order, settings }: InvoiceClientProps) {
             <h2 className="text-xl font-black text-slate-900 print:text-black">INVOICE</h2>
             <p className="text-xs text-slate-500 print:text-black">Order / Invoice No: <span className="font-mono font-bold text-slate-800 print:text-black">#{formatOrderNumber(order.id)}</span></p>
             <p className="text-xs text-slate-500 print:text-black">Date: <span className="font-semibold text-slate-800 print:text-black">{date}</span></p>
+            {order.payment_details?.last_adjusted_at && (
+              <p className="text-xs text-slate-500 print:text-black">
+                Updated: <span className="font-semibold text-slate-800 print:text-black">
+                  {new Date(order.payment_details.last_adjusted_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </span>
+              </p>
+            )}
             
             <div className="flex flex-wrap sm:justify-end gap-1.5 mt-2">
               {/* Order Status Badge */}

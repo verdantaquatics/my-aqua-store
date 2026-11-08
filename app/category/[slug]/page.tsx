@@ -9,7 +9,7 @@ interface PageProps {
 }
 
 // Generated on first visit, then served from the CDN (refreshed on changes)
-export const revalidate = 300
+export const revalidate = 3600
 
 export async function generateStaticParams() {
   return []

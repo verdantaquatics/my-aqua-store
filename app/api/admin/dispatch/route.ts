@@ -5,6 +5,22 @@ import { getStoreSettings } from '@/utils/settings'
 import { getPathaoToken, bookSteadfastConsignment } from '@/utils/courier'
 import { sendOrderDispatchedEmail } from '@/utils/email'
 import axios from 'axios'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { syncOrderStock, describeShortages } from '@/utils/inventory'
+import { revalidateStockChanges } from '@/utils/revalidate'
+
+// A dispatched order has been accepted: take its stock if that hasn't happened yet
+async function takeDispatchedStock(db: SupabaseClient, orderId: string): Promise<string[]> {
+  try {
+    const { changes, shortages } = await syncOrderStock(db, orderId, 'Shipped')
+    await revalidateStockChanges(db, changes)
+    const warning = describeShortages(shortages)
+    return warning ? [warning] : []
+  } catch (err) {
+    console.error(`Failed to take stock for dispatched order ${orderId}:`, err)
+    return []
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +75,7 @@ export async function POST(request: NextRequest) {
           order_status: 'Shipped'
         })
         .eq('id', order.id)
+      const stockWarnings = await takeDispatchedStock(adminDb, order.id)
 
       if (order.customer_email) {
         sendOrderDispatchedEmail({
@@ -75,7 +92,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        provider: 'manual'
+        provider: 'manual',
+        warnings: stockWarnings
       })
     }
 
@@ -97,6 +115,7 @@ export async function POST(request: NextRequest) {
             order_status: 'Shipped'
           })
           .eq('id', order.id)
+        const stockWarnings = await takeDispatchedStock(adminDb, order.id)
 
         if (order.customer_email) {
           sendOrderDispatchedEmail({
@@ -118,7 +137,8 @@ export async function POST(request: NextRequest) {
           provider: 'steadfast',
           consignment_id: steadfastResult.consignment_id,
           tracking_code: steadfastResult.tracking_code,
-          cod_amount: codAmount
+          cod_amount: codAmount,
+          warnings: stockWarnings
         })
       } else {
         return NextResponse.json(
@@ -176,6 +196,7 @@ export async function POST(request: NextRequest) {
           order_status: 'Shipped'
         })
         .eq('id', order.id)
+      const stockWarnings = await takeDispatchedStock(adminDb, order.id)
 
       if (order.customer_email) {
         sendOrderDispatchedEmail({
@@ -195,7 +216,8 @@ export async function POST(request: NextRequest) {
         success: true, 
         provider: 'pathao', 
         consignment_id: consignmentId,
-        cod_amount: codAmount
+        cod_amount: codAmount,
+        warnings: stockWarnings
       })
     }
 

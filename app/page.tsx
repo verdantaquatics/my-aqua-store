@@ -2,9 +2,9 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { PUBLIC_PRODUCT_COLUMNS, toListingProducts } from '@/utils/product-columns'
 import HomePageClient from '@/components/HomePageClient'
 
-// Cached and served from the CDN; refreshed every 5 minutes and immediately
+// Cached and served from the CDN; refreshed hourly and immediately
 // whenever products, settings or stock change (see utils/revalidate.ts)
-export const revalidate = 300
+export const revalidate = 3600
 
 export default async function HomePage() {
   const supabase = createAdminClient()

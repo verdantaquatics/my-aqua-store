@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
 import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
-import { restoreOrderInventory } from '@/utils/inventory'
-import { revalidateStorefront } from '@/utils/revalidate'
+import { syncOrderStock } from '@/utils/inventory'
+import { revalidateStockChanges } from '@/utils/revalidate'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
         const statusChanged = Boolean((mapping.order_status && mapping.order_status !== oldStatus) || (mapping.payment_status && mapping.payment_status !== oldPaymentStatus))
 
         if (statusChanged) {
-          // If status moved to Cancelled/Returned -> restore stock
-          if (oldStatus !== 'Cancelled' && mapping.order_status === 'Cancelled') {
-            await restoreOrderInventory(adminDb, order.id)
-            revalidateStorefront()
+          // Returned/cancelled -> give stock back; picked up/delivered -> make sure it was taken
+          if (mapping.order_status && mapping.order_status !== oldStatus) {
+            const { changes } = await syncOrderStock(adminDb, order.id, mapping.order_status)
+            await revalidateStockChanges(adminDb, changes)
           }
 
           const updatePayload: Record<string, any> = {}
