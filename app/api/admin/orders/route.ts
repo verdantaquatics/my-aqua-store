@@ -7,10 +7,20 @@ import {
   shortageOf, describeShortages, StockChange, StockShortage
 } from '@/utils/inventory'
 import { sendOrderDispatchedEmail, sendOrderCancelledEmail, sendOrderUpdatedEmail, OrderItemChange } from '@/utils/email'
+import { resolveProductVariant, PricingError } from '@/utils/order-pricing'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_LINE_QTY = 999
+const MAX_ORDER_LINES = 50
+
+interface OrderLine {
+  item: any // the order_items row (or, for an added product, the row about to be inserted)
+  oldQty: number // 0 for added products
+  quantity: number
+  price: number
+  isNew?: boolean
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -39,6 +49,7 @@ export async function PUT(request: NextRequest) {
       discount_amount, // optional: adjusted discount after item changes
       items, // array of { id, quantity, price }
       deleted_item_ids, // array of string IDs to remove
+      added_items, // array of { product_id, quantity, selected_variations } to add
       notify_customer, // optional: email the customer the updated order
       restock_removed // optional (default true): put removed / reduced units back into stock
     } = body
@@ -98,7 +109,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const finalLines = existingItems
+    const finalLines: OrderLine[] = existingItems
       .filter((it) => !deletedIds.has(String(it.id)))
       .map((it) => {
         const req = requested.get(String(it.id))
@@ -109,6 +120,54 @@ export async function PUT(request: NextRequest) {
           price: req ? req.price : Number(it.price) || 0
         }
       })
+
+    // Products the owner added to the order (e.g. the customer forgot one).
+    // Priced from the products table exactly like checkout.
+    const addedRaw: any[] = Array.isArray(added_items) ? added_items : []
+    if (addedRaw.length > 0) {
+      if (finalLines.length + addedRaw.length > MAX_ORDER_LINES) {
+        return NextResponse.json({ error: `An order can have at most ${MAX_ORDER_LINES} items.` }, { status: 400 })
+      }
+      const productIds = Array.from(new Set(addedRaw.map((a) => String(a?.product_id || '')).filter(Boolean)))
+      const { data: products, error: productsError } = await adminDb
+        .from('products')
+        .select('id, name, price, stock, variations')
+        .in('id', productIds)
+      if (productsError) {
+        return NextResponse.json({ error: 'Could not load the products to add.' }, { status: 500 })
+      }
+      const productsById = new Map<string, any>((products || []).map((p: any) => [String(p.id), p]))
+
+      for (const raw of addedRaw) {
+        const product = productsById.get(String(raw?.product_id || ''))
+        if (!product) {
+          return NextResponse.json({ error: 'A product you added no longer exists.' }, { status: 400 })
+        }
+        const qty = Math.floor(Number(raw.quantity))
+        if (!Number.isFinite(qty) || qty < 1 || qty > MAX_LINE_QTY) {
+          return NextResponse.json({ error: `Invalid quantity for ${product.name}.` }, { status: 400 })
+        }
+        let resolved
+        try {
+          resolved = resolveProductVariant(product, raw.selected_variations)
+        } catch (err: any) {
+          if (err instanceof PricingError) return NextResponse.json({ error: err.message }, { status: 400 })
+          throw err
+        }
+        finalLines.push({
+          item: {
+            id: null,
+            product_id: product.id,
+            selected_variations: resolved.selectedVariations,
+            products: { name: product.name }
+          },
+          oldQty: 0,
+          quantity: qty,
+          price: resolved.price,
+          isNew: true
+        })
+      }
+    }
 
     if (existingItems.length > 0 && finalLines.length === 0) {
       return NextResponse.json(
@@ -152,7 +211,7 @@ export async function PUT(request: NextRequest) {
 
     // Items can be changed on Pending and Confirmed orders, not once shipped or cancelled
     // (the courier already has the parcel and its cash-to-collect amount)
-    const priceChanged = finalLines.some((line) => line.price !== Number(line.item.price))
+    const priceChanged = finalLines.some((line) => !line.isNew && line.price !== Number(line.item.price))
     if ((itemChanges.length > 0 || priceChanged) && !(canEditOrderItems(oldStatus) && willBeActive)) {
       return NextResponse.json(
         { error: 'Items can only be changed on Pending or Confirmed orders (not after shipping or cancelling).' },
@@ -174,7 +233,26 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const newLines = finalLines.filter((line) => line.isNew)
+    if (newLines.length > 0) {
+      const { error: insertError } = await adminDb
+        .from('order_items')
+        .insert(newLines.map((line) => ({
+          order_id: id,
+          product_id: line.item.product_id,
+          quantity: line.quantity,
+          price: line.price,
+          selected_variations: line.item.selected_variations
+        })))
+
+      if (insertError) {
+        console.error('Failed to add order items:', insertError)
+        return NextResponse.json({ error: 'Failed to add the new products to the order.' }, { status: 500 })
+      }
+    }
+
     for (const line of finalLines) {
+      if (line.isNew) continue
       if (line.quantity === line.oldQty && line.price === Number(line.item.price)) continue
       const { error: itemError } = await adminDb
         .from('order_items')

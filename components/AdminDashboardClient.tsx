@@ -18,6 +18,7 @@ import axios from 'axios'
 
 interface OrderItem {
   id: string
+  product_id?: string
   quantity: number
   price: number
   selected_variations?: Record<string, string>
@@ -67,13 +68,61 @@ interface DashboardProps {
 }
 
 interface EditableItem {
-  id: string
+  id: string // for products added in this edit: a temporary "new-..." id
+  product_id?: string
   name: string
   quantity: number
-  originalQuantity: number
+  originalQuantity: number // 0 for products added in this edit
   price: number
   selected_variations?: Record<string, string>
+  isNew?: boolean
 }
+
+// A product found with "Add product" in the Edit Order window
+interface PickerProduct {
+  id: string
+  name: string
+  price: number
+  stock: number
+  variations: any
+  images?: string[]
+  is_hidden?: boolean
+}
+
+type PickerOption = { name: string; values: { label: string; stock?: number; price?: number }[] }
+
+// Same reading of product variations as checkout (utils/order-pricing.ts)
+function pickerOptions(variations: any): PickerOption[] {
+  if (!variations || typeof variations !== 'object' || !Array.isArray(variations.options)) return []
+  return variations.options
+    .filter((opt: any) => opt && Array.isArray(opt.values) && opt.values.length > 0)
+    .map((opt: any) => ({
+      name: String(opt.name || 'Option'),
+      values: opt.values.map((v: any) => ({
+        label: String(v?.label ?? v),
+        stock: typeof v?.stock === 'number' ? v.stock : undefined,
+        price: v?.price !== undefined && v?.price !== null && v?.price !== '' ? Number(v.price) : undefined
+      }))
+    }))
+}
+
+function pickerVariant(product: PickerProduct, chosen: Record<string, string>) {
+  let price = Number(product.price) || 0
+  let stock = Number(product.stock) || 0
+  let minStock = Infinity
+  let complete = true
+  for (const opt of pickerOptions(product.variations)) {
+    const value = opt.values.find((v) => v.label === chosen[opt.name])
+    if (!value) { complete = false; continue }
+    if (value.price !== undefined && value.price > 0) price = value.price
+    if (typeof value.stock === 'number') minStock = Math.min(minStock, value.stock)
+  }
+  if (minStock !== Infinity) stock = minStock
+  return { price, stock, complete }
+}
+
+const sameVariations = (a?: Record<string, string> | null, b?: Record<string, string> | null) =>
+  JSON.stringify(Object.entries(a || {}).sort()) === JSON.stringify(Object.entries(b || {}).sort())
 
 export default function AdminDashboardClient({ initialOrders }: DashboardProps) {
   const router = useRouter()
@@ -125,6 +174,15 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([])
   const [notifyCustomer, setNotifyCustomer] = useState(true)
   const [restockRemoved, setRestockRemoved] = useState(false)
+
+  // "Add product" picker in the Edit Order window
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerResults, setPickerResults] = useState<PickerProduct[]>([])
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerProduct, setPickerProduct] = useState<PickerProduct | null>(null)
+  const [pickerChoice, setPickerChoice] = useState<Record<string, string>>({})
+  const [pickerQty, setPickerQty] = useState(1)
 
   const [locationCities, setLocationCities] = useState<any[]>([])
   const [locationZones, setLocationZones] = useState<any[]>([])
@@ -258,10 +316,12 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
     setDeletedItemIds([])
     setNotifyCustomer(true)
     setRestockRemoved(false)
+    closeProductPicker()
 
     // Populate editable items
     const itemsList: EditableItem[] = (order.order_items || []).map((it) => ({
       id: it.id,
+      product_id: it.product_id,
       name: it.products?.name || 'Product Item',
       quantity: it.quantity,
       originalQuantity: it.quantity,
@@ -307,10 +367,88 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
     // An order must keep at least one item; to drop everything, cancel the order
     if (editItems.length <= 1) return
     const itemToRemove = editItems[index]
-    if (itemToRemove?.id) {
+    // Products added in this edit aren't saved yet, so there's nothing to delete
+    if (itemToRemove?.id && !itemToRemove.isNew) {
       setDeletedItemIds((prev) => [...prev, itemToRemove.id])
     }
     setEditItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // "Add product" picker
+  const closeProductPicker = () => {
+    setPickerOpen(false)
+    setPickerSearch('')
+    setPickerResults([])
+    setPickerProduct(null)
+    setPickerChoice({})
+    setPickerQty(1)
+  }
+
+  useEffect(() => {
+    if (!pickerOpen || pickerProduct) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setPickerLoading(true)
+      try {
+        const res = await fetch(`/api/admin/products?search=${encodeURIComponent(pickerSearch.trim())}`)
+        const json = await res.json()
+        if (!cancelled) setPickerResults(Array.isArray(json.data) ? json.data : [])
+      } catch (err) {
+        console.error(err)
+        if (!cancelled) setPickerResults([])
+      } finally {
+        if (!cancelled) setPickerLoading(false)
+      }
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [pickerOpen, pickerSearch, pickerProduct])
+
+  const choosePickerProduct = (product: PickerProduct) => {
+    setPickerProduct(product)
+    setPickerQty(1)
+    // Preselect the first value of each option to save clicks
+    const initial: Record<string, string> = {}
+    pickerOptions(product.variations).forEach((opt) => {
+      if (opt.values[0]) initial[opt.name] = opt.values[0].label
+    })
+    setPickerChoice(initial)
+  }
+
+  const handleAddPickedProduct = () => {
+    if (!pickerProduct) return
+    const variant = pickerVariant(pickerProduct, pickerChoice)
+    if (!variant.complete) return
+    const qty = Math.max(1, Math.floor(pickerQty) || 1)
+    const chosen = pickerOptions(pickerProduct.variations).length > 0 ? { ...pickerChoice } : {}
+
+    setEditItems((prev) => {
+      // Already in the order with the same options -> just raise that line's quantity
+      const existingIndex = prev.findIndex(
+        (it) => it.product_id === pickerProduct.id && sameVariations(it.selected_variations, chosen)
+      )
+      if (existingIndex >= 0) {
+        const next = [...prev]
+        next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + qty }
+        return next
+      }
+      return [
+        ...prev,
+        {
+          id: `new-${pickerProduct.id}-${Date.now()}`,
+          product_id: pickerProduct.id,
+          name: pickerProduct.name,
+          quantity: qty,
+          originalQuantity: 0,
+          price: variant.price,
+          selected_variations: chosen,
+          isNew: true
+        }
+      ]
+    })
+    closeProductPicker()
   }
 
   // Save Order Changes
@@ -344,12 +482,17 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
           payment_status: editPaymentStatus,
           advance_paid: editAdvancePaid,
           discount_amount: editDiscountAmount,
-          items: editItems.map((it) => ({
+          items: editItems.filter((it) => !it.isNew).map((it) => ({
             id: it.id,
             quantity: it.quantity,
             price: it.price
           })),
           deleted_item_ids: deletedItemIds,
+          added_items: editItems.filter((it) => it.isNew).map((it) => ({
+            product_id: it.product_id,
+            quantity: it.quantity,
+            selected_variations: it.selected_variations || {}
+          })),
           notify_customer: notifyCustomer && orderItemsOrTotalChanged,
           restock_removed: restockRemoved
         })
@@ -2176,7 +2319,11 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                           )}
                           <p className="text-[11px] text-slate-500 mt-0.5">
                             ৳{Number(item.price).toLocaleString()} / unit
-                            {item.quantity !== item.originalQuantity && (
+                            {item.isNew ? (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                Added
+                              </span>
+                            ) : item.quantity !== item.originalQuantity && (
                               <span className="ml-1.5 font-bold text-amber-700">
                                 (customer ordered {item.originalQuantity})
                               </span>
@@ -2229,6 +2376,159 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Add a product the customer asked for after ordering */}
+                {canEditItems && !pickerOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(true)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:border-brand-500 hover:text-brand-700 hover:bg-brand-50/40 transition"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add product
+                  </button>
+                )}
+
+                {canEditItems && pickerOpen && (
+                  <div className="p-3 rounded-2xl border border-brand-200 bg-brand-50/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-700">Add a product to this order</span>
+                      <button
+                        type="button"
+                        onClick={closeProductPicker}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    {!pickerProduct ? (
+                      <>
+                        <div className="relative">
+                          <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={pickerSearch}
+                            onChange={(e) => setPickerSearch(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+                            placeholder="Search products by name..."
+                            className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-2 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+
+                        <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                          {pickerLoading ? (
+                            <div className="p-4 flex justify-center">
+                              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                            </div>
+                          ) : pickerResults.length === 0 ? (
+                            <p className="p-4 text-center text-[11px] text-slate-400">No products found.</p>
+                          ) : (
+                            pickerResults.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => choosePickerProduct(p)}
+                                className="w-full flex items-center gap-2.5 p-2 text-left hover:bg-slate-50 transition"
+                              >
+                                {p.images?.[0] ? (
+                                  <img src={p.images[0]} alt="" className="h-9 w-9 rounded-lg object-cover bg-slate-100 shrink-0" />
+                                ) : (
+                                  <div className="h-9 w-9 rounded-lg bg-slate-100 shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 truncate">{p.name}</p>
+                                  <p className="text-[10px] text-slate-500">
+                                    ৳{Number(p.price).toLocaleString()} · {Number(p.stock) > 0 ? `${p.stock} in stock` : <span className="text-red-600 font-bold">out of stock</span>}
+                                    {p.is_hidden && <span className="ml-1 text-amber-700 font-bold">· hidden</span>}
+                                  </p>
+                                </div>
+                                <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    ) : (() => {
+                      const options = pickerOptions(pickerProduct.variations)
+                      const variant = pickerVariant(pickerProduct, pickerChoice)
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-slate-900 truncate">{pickerProduct.name}</p>
+                            <button
+                              type="button"
+                              onClick={() => { setPickerProduct(null); setPickerChoice({}) }}
+                              className="text-[11px] font-bold text-brand-700 hover:underline shrink-0"
+                            >
+                              Change product
+                            </button>
+                          </div>
+
+                          {options.map((opt) => (
+                            <div key={opt.name} className="space-y-1">
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{opt.name}</label>
+                              <select
+                                value={pickerChoice[opt.name] || ''}
+                                onChange={(e) => setPickerChoice((prev) => ({ ...prev, [opt.name]: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+                              >
+                                <option value="" disabled>Choose {opt.name}</option>
+                                {opt.values.map((v) => (
+                                  <option key={v.label} value={v.label}>
+                                    {v.label}
+                                    {v.price !== undefined && v.price > 0 ? ` · ৳${v.price.toLocaleString()}` : ''}
+                                    {typeof v.stock === 'number' ? ` · ${v.stock > 0 ? `${v.stock} in stock` : 'out of stock'}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+                              <button
+                                type="button"
+                                onClick={() => setPickerQty((q) => Math.max(1, q - 1))}
+                                className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 transition"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="px-2.5 py-1 text-xs font-bold text-slate-900 min-w-[28px] text-center">{pickerQty}</span>
+                              <button
+                                type="button"
+                                onClick={() => setPickerQty((q) => q + 1)}
+                                className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 transition"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-black text-slate-900">৳{(variant.price * pickerQty).toLocaleString()}</p>
+                              <p className="text-[10px] text-slate-500">৳{variant.price.toLocaleString()} / unit</p>
+                            </div>
+                          </div>
+
+                          {variant.complete && pickerQty > variant.stock && (
+                            <p className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                              Only {variant.stock} in stock right now. You can still add it if you have the units on hand.
+                            </p>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleAddPickedProduct}
+                            disabled={!variant.complete}
+                            className="w-full px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-sm disabled:bg-slate-300 transition"
+                          >
+                            Add to order
+                          </button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

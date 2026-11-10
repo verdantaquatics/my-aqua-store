@@ -451,7 +451,7 @@ export interface OrderItemChange {
   name: string
   selectedVariations?: Record<string, string> | null
   fromQty: number
-  toQty: number // 0 = removed from the order
+  toQty: number // 0 = removed from the order (fromQty 0 = added to the order)
 }
 
 interface OrderUpdatedPayload {
@@ -501,7 +501,9 @@ export async function sendOrderUpdatedEmail(payload: OrderUpdatedPayload) {
       const vars = variationText(c.selectedVariations, true)
       const what = c.toQty <= 0
         ? `<span style="color: #b91c1c; font-weight: 700;">Removed</span> <span style="color: #64748b;">(was ${c.fromQty})</span>`
-        : `<span style="color: #64748b; text-decoration: line-through;">${c.fromQty}</span> &rarr; <strong>${c.toQty}</strong>`
+        : c.fromQty <= 0
+          ? `<span style="color: #047857; font-weight: 700;">Added</span> &times; <strong>${c.toQty}</strong>`
+          : `<span style="color: #64748b; text-decoration: line-through;">${c.fromQty}</span> &rarr; <strong>${c.toQty}</strong>`
       return `
       <tr>
         <td style="padding: 8px 10px; border-bottom: 1px solid #fde68a; font-size: 13px; color: #1e293b;">

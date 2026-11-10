@@ -97,7 +97,7 @@ Both require the `CRON_SECRET` bearer header. Vercel Cron sends it automatically
 - COD and bKash Personal orders take stock as soon as they are placed. bKash gateway orders take stock once the payment succeeds, so abandoned or failed payments never lock items as out of stock.
 - An order that doesn't hold stock yet (e.g. unpaid bKash) takes it when the store accepts or dispatches it. Stock is given back when an order is cancelled, returned or deleted.
 - `payment_details.stock_deducted` records whether an order currently holds stock, so stock is never taken twice or given back when it was never taken. The rules live in `utils/order-stock.ts`; use the helpers in `utils/inventory.ts` (`syncOrderStock`, `takeOrderStock`, `releaseOrderStock`) for any new code that changes an order's status.
-- Items can be changed on **Pending** and **Confirmed** orders (not after shipping or cancelling). The owner can lower or raise quantities and remove items, optionally put removed units back in stock, adjust the discount, and email the customer the updated order. The invoice updates automatically. Raising a quantity beyond what's in stock shows a warning.
+- Items can be changed on **Pending** and **Confirmed** orders (not after shipping or cancelling). The owner can lower or raise quantities, remove items, add products the customer asked for after ordering (priced like checkout; taken from stock if the order holds stock), optionally put removed units back in stock, adjust the discount, and email the customer the updated order. The invoice updates automatically. Raising a quantity beyond what's in stock shows a warning.
 
 ## Performance & caching
 

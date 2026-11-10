@@ -40,6 +40,38 @@ function getVariationOptions(variations: any): { name: string; values: { label: 
     }))
 }
 
+/**
+ * Price one product with the chosen variations, the same way checkout does.
+ * Returns the unit price, the cleaned-up variation choice and the units in stock.
+ */
+export function resolveProductVariant(
+  product: any,
+  selectedRaw: any
+): { price: number; selectedVariations: Record<string, string>; available: number } {
+  const options = getVariationOptions(product.variations)
+  const chosen = selectedRaw && typeof selectedRaw === 'object' ? selectedRaw : {}
+  const selectedVariations: Record<string, string> = {}
+
+  let price = Number(product.price)
+  let available = Number(product.stock) || 0
+
+  if (options.length > 0) {
+    let minStock = Infinity
+    for (const opt of options) {
+      const value = opt.values.find((v) => v.label === chosen[opt.name])
+      if (!value) {
+        throw new PricingError(`Please choose a valid ${opt.name} for ${product.name}.`)
+      }
+      selectedVariations[opt.name] = value.label
+      if (value.price !== undefined && value.price > 0) price = value.price
+      if (typeof value.stock === 'number') minStock = Math.min(minStock, value.stock)
+    }
+    if (minStock !== Infinity) available = minStock
+  }
+
+  return { price, selectedVariations, available }
+}
+
 function getProductCategoryIds(product: any): string[] {
   const ids = new Set<string>()
   if (product.category_id) ids.add(product.category_id)
@@ -82,27 +114,7 @@ export async function priceCart(db: SupabaseClient, cartItems: any): Promise<{ i
       throw new PricingError(`Invalid quantity for ${product.name}.`)
     }
 
-    const options = getVariationOptions(product.variations)
-    const selectedRaw = raw.selectedVariations && typeof raw.selectedVariations === 'object' ? raw.selectedVariations : {}
-    const selectedVariations: Record<string, string> = {}
-
-    let price = Number(product.price)
-    let available = Number(product.stock) || 0
-
-    if (options.length > 0) {
-      let minStock = Infinity
-      for (const opt of options) {
-        const label = selectedRaw[opt.name]
-        const value = opt.values.find((v) => v.label === label)
-        if (!value) {
-          throw new PricingError(`Please choose a valid ${opt.name} for ${product.name}.`)
-        }
-        selectedVariations[opt.name] = value.label
-        if (value.price !== undefined && value.price > 0) price = value.price
-        if (typeof value.stock === 'number') minStock = Math.min(minStock, value.stock)
-      }
-      if (minStock !== Infinity) available = minStock
-    }
+    const { price, selectedVariations, available } = resolveProductVariant(product, raw.selectedVariations)
 
     const stockKey = `${product.id}:${JSON.stringify(selectedVariations)}`
     const totalRequested = (requested.get(stockKey) || 0) + quantity

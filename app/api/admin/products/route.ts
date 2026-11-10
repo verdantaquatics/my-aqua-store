@@ -6,6 +6,37 @@ import { sanitizeRichText } from '@/utils/sanitize'
 
 export const dynamic = 'force-dynamic'
 
+// GET: search products by name (dashboard: "Add product" when editing an order)
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
+    const search = (new URL(request.url).searchParams.get('search') || '').trim().slice(0, 100)
+    const adminDb = createAdminClient()
+    let query = adminDb
+      .from('products')
+      .select('id, name, price, stock, variations, images, is_hidden')
+      .order('name', { ascending: true })
+      .limit(20)
+
+    if (search) {
+      query = query.ilike('name', `%${search.replace(/[\\%_]/g, (m) => `\\${m}`)}%`)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, data: data || [] })
+  } catch (error: any) {
+    console.error('Product search error:', error.message)
+    return NextResponse.json({ error: 'Failed to search products' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
